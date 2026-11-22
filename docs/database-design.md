@@ -371,7 +371,8 @@ Ký hiệu: `||` = đúng 1, `o|` = 0 hoặc 1, `o{` = 0 hoặc nhiều.
 ### Sản phẩm và giỏ hàng
 
 - `SanPham`: `gia_ban >= 0`, `so_luong_ton >= 0`, `nguong_ton_toi_thieu >= 0`.
-- `ChiTietGioHang`, `ChiTietDonHang`, `ChiTietPhieuNhap`, `ChiTietPhieuKiemKe`: `so_luong > 0`.
+- `ChiTietGioHang`, `ChiTietDonHang`, `ChiTietPhieuNhap`: `so_luong > 0`.
+- `ChiTietPhieuKiemKe` **không có cột `so_luong`**; ràng buộc thực tế là `so_luong_he_thong >= 0`, `so_luong_thuc_te >= 0` và `chenh_lech = so_luong_thuc_te - so_luong_he_thong`.
 - `ChiTietDonHang.don_gia >= 0`; `ChiTietPhieuNhap.gia_nhap >= 0`.
 - `ChiTietGioHang` không lưu giá; giá hiển thị lấy từ `SanPham.gia_ban`, chỉ chốt khi tạo `ChiTietDonHang`.
 - `ThanhPhanCombo`: `combo_id <> san_pham_id`, `so_luong > 0`.
@@ -405,11 +406,11 @@ Voucher hợp lệ khi đồng thời:
 - Trừ tồn: UPDATE có điều kiện `so_luong_ton >= n`; không đủ thì rollback toàn bộ đơn.
 - Cộng tồn khi nhập kho: chỉ sau khi phiếu chuyển `DA_NHAP_KHO`.
 - Duyệt kiểm kê: `so_luong_ton = so_luong_ton + chenh_lech`; nếu kết quả âm thì rollback.
-- `LichSuTonKho`: `so_luong_sau = so_luong_truoc + so_luong_thay_doi`; `so_luong_sau >= 0`.
-- Mỗi `LichSuTonKho` có tối đa một nguồn: phiếu nhập, đơn hàng hoặc phiếu kiểm kê.
-- `PhieuNhapKho.tong_tien = SUM(ChiTietPhieuNhap.thanh_tien)`.
-- `PhieuKiemKe` từ chối phải có `ly_do_tu_choi`.
-- `PhieuNhapKho` đã `DA_NHAP_KHO` không được hủy.
+- `LichSuTonKho`: `so_luong_truoc >= 0`, `so_luong_sau >= 0` và `so_luong_sau = so_luong_truoc + so_luong_thay_doi` (CHECK `LichSuTonKho_cong_thuc_check`).
+- Mỗi `LichSuTonKho` có tối đa một nguồn: phiếu nhập, đơn hàng hoặc phiếu kiểm kê (CHECK `LichSuTonKho_mot_nguon_check`: `num_nonnulls(phieu_nhap_id, don_hang_id, phieu_kiem_ke_id) <= 1`). Điều chỉnh tay để trống cả ba.
+- `PhieuNhapKho.tong_tien = SUM(ChiTietPhieuNhap.thanh_tien)` — thực hiện bằng constraint trigger hoãn đến cuối transaction (xem 4.5).
+- `PhieuKiemKe` từ chối phải có `ly_do_tu_choi`; đã duyệt phải có `nguoi_duyet_id` và `ngay_duyet`.
+- `PhieuNhapKho` đã `DA_NHAP_KHO` phải có `nguoi_xac_nhan_id` và `ngay_xac_nhan`, không được hủy.
 - `ngay_nhap` dùng cho báo cáo nhập hàng; `ngay_xac_nhan` dùng cho sổ kho và thời điểm tăng tồn.
 
 ### Đặt trước
@@ -417,33 +418,84 @@ Voucher hợp lệ khi đồng thời:
 - Không tạo `ThanhToan`, không trừ tồn, không cộng điểm.
 - Chỉ chuyển sang đơn hàng khi khách mua thực tế; ghi `don_hang_id` và `DA_CHUYEN_DON`.
 
+### Ghi chú thực thi (đối chiếu migration)
+
+- `ChiTietPhieuKiemKe` dùng `so_luong_he_thong` / `so_luong_thuc_te` thay cho `so_luong`.
+- `DonHang_giam_voucher_check` không thể vi phạm độc lập: khi `tien_giam_voucher > tien_hang` và các khoản giảm không âm thì `DonHang_giam_diem_check` cũng vi phạm. Cả hai ràng buộc vẫn được giữ theo thiết kế; PostgreSQL có thể báo ràng buộc giảm điểm.
+- `PhieuNhapKho.tong_tien` và nguồn của `LichSuTonKho` được kiểm tra bằng trigger/CHECK bổ sung trong migration, không khai báo trong `schema.prisma`.
+
 ## 4.5. Migration SQL thủ công
 
-Gom vào **một file migration duy nhất**, chạy sau migration tạo bảng:
+Các ràng buộc thủ công được chia thành hai migration, chạy sau migration tạo bảng:
 
-1. Partial unique: mỗi `DonHang` chỉ có một `ThanhToan` trạng thái `THANH_CONG`.
-2. Exclusion constraint `PhieuKiemKe`: chặn chồng giữa kiểm kê toàn cửa hàng và kiểm kê theo danh mục; chỉ xét phiếu `NHAP`/`CHO_DUYET`.
-   - Toàn cửa hàng biểu diễn bằng khoảng phủ toàn bộ ID danh mục.
-   - Theo danh mục biểu diễn bằng khoảng `[id, id+1)`.
-   - Dùng `int4range` + toán tử `&&` trong exclusion constraint.
-3. CHECK constraints:
-   - Số lượng, giá, tồn, điểm, tổng tiền, công thức sổ kho.
-   - Ràng buộc kênh bán của `DonHang`.
-   - Ràng buộc trạng thái `PhieuNhapKho`, `PhieuKiemKe`.
-   - `KhachHang` phải có ít nhất `sdt` hoặc `email`.
-4. Trigger chặn chuyển trạng thái cấm:
-   - `PhieuNhapKho`: `DA_NHAP_KHO → DA_HUY`.
-   - `PhieuKiemKe`: `DA_DUYET → *`.
-5. Index bổ sung:
-   - Trigram/GIN trên `SanPham.ten_sp`.
-   - `SanPham(danh_muc_id, trang_thai)`.
-   - `DonHang(kenh_ban, ngay_tao)`, `DonHang(trang_thai)`.
-   - `LichSuTonKho(san_pham_id, ngay_tao)`.
-   - `LichSuDiem(khach_hang_id, ngay_tao)`.
-   - `DonDatTruoc(san_pham_id, trang_thai)`.
-   - `Voucher(trang_thai, ngay_ket_thuc)`.
+1. `20261122081115_constraints`: extension, partial unique, exclusion, CHECK, trigger trạng thái, trigger tổng tiền và index.
+2. `20261122082142_lich_su_ton_kho_mot_nguon`: bổ sung CHECK nguồn của `LichSuTonKho` (ràng buộc bị thiếu trong lần rà soát đầu).
 
-Prisma schema chỉ khai báo model, quan hệ và unique thường; các partial unique, exclusion, CHECK và trigger nằm trong migration SQL để tránh drift.
+### 4.5.1. Partial unique
+
+`ThanhToan_mot_thanh_cong_moi_don` — unique index trên `ThanhToan(don_hang_id)` với điều kiện `trang_thai = 'THANH_CONG'`.
+
+### 4.5.2. Exclusion constraint `PhieuKiemKe`
+
+Tên: `PhieuKiemKe_khong_chong_pham_vi`. Cần extension `btree_gist`. Biểu diễn phạm vi bằng `int4range` và toán tử `&&`:
+
+```sql
+ALTER TABLE "PhieuKiemKe"
+  ADD CONSTRAINT "PhieuKiemKe_khong_chong_pham_vi"
+  EXCLUDE USING gist (
+    (
+      int4range(
+        CASE WHEN "danh_muc_id" IS NULL THEN NULL ELSE "danh_muc_id" END,
+        CASE WHEN "danh_muc_id" IS NULL THEN NULL ELSE "danh_muc_id" + 1 END
+      )
+    ) WITH &&
+  )
+  WHERE ("trang_thai" IN ('NHAP', 'CHO_DUYET'));
+```
+
+- Toàn cửa hàng (`danh_muc_id IS NULL`): `int4range(NULL, NULL)` — khoảng không biên, phủ toàn bộ ID.
+- Theo danh mục: `[danh_muc_id, danh_muc_id + 1)`.
+- Chỉ xét phiếu `NHAP` / `CHO_DUYET`; phiếu đã duyệt/hủy/từ chối không tham gia.
+
+### 4.5.3. CHECK constraints
+
+Đã áp dụng 33 CHECK (32 ở migration `constraints`, 1 ở migration bổ sung):
+
+- Số lượng, giá, tồn, điểm, tổng tiền, công thức sổ kho.
+- Ràng buộc kênh bán của `DonHang`.
+- Ràng buộc trạng thái `PhieuNhapKho`, `PhieuKiemKe`.
+- `KhachHang` phải có ít nhất `sdt` hoặc `email`.
+- `LichSuTonKho_mot_nguon_check`: tối đa một nguồn.
+- `ChiTietPhieuKiemKe`: hai cột số lượng không âm và `chenh_lech` đúng công thức.
+- Ghi chú: `DonHang_giam_voucher_check` bị bao trùm bởi `DonHang_giam_diem_check` khi các khoản giảm không âm; không thể test vi phạm riêng.
+
+### 4.5.4. Trigger
+
+- Chặn chuyển trạng thái:
+  - `PhieuNhapKho_chan_huy_sau_khi_nhap`: `DA_NHAP_KHO → DA_HUY`.
+  - `PhieuKiemKe_chan_doi_trang_thai_sau_duyet`: `DA_DUYET → trạng thái khác`.
+- Tổng tiền phiếu nhập (constraint trigger hoãn, `DEFERRABLE INITIALLY DEFERRED`):
+  - `PhieuNhapKho_kiem_tra_tong_tien` (sau INSERT/UPDATE `tong_tien`).
+  - `ChiTietPhieuNhap_kiem_tra_tong_tien` (sau INSERT/UPDATE/DELETE).
+  - Kiểm tra `tong_tien = SUM(ChiTietPhieuNhap.thanh_tien)` tại cuối transaction; có thể ép kiểm tra sớm bằng `SET CONSTRAINTS ALL IMMEDIATE`.
+
+### 4.5.5. Index bổ sung
+
+- `SanPham_ten_sp_trgm_idx` — GIN trigram trên `SanPham.ten_sp` (cần `pg_trgm`).
+- `SanPham_danh_muc_id_trang_thai_idx` — `SanPham(danh_muc_id, trang_thai)`.
+- `DonHang_kenh_ban_ngay_tao_idx` — `DonHang(kenh_ban, ngay_tao)`.
+- `DonHang_trang_thai_idx` — `DonHang(trang_thai)`.
+- `LichSuTonKho_san_pham_id_ngay_tao_idx` — `LichSuTonKho(san_pham_id, ngay_tao)`.
+- `LichSuDiem_khach_hang_id_ngay_tao_idx` — `LichSuDiem(khach_hang_id, ngay_tao)`.
+- `DonDatTruoc_san_pham_id_trang_thai_idx` — `DonDatTruoc(san_pham_id, trang_thai)`.
+- `Voucher_trang_thai_ngay_ket_thuc_idx` — `Voucher(trang_thai, ngay_ket_thuc)`.
+
+### 4.5.6. Extension
+
+- `btree_gist` — cho exclusion constraint.
+- `pg_trgm` — cho index trigram tên sản phẩm.
+
+Prisma schema chỉ khai báo model, quan hệ và unique thường; các partial unique, exclusion, CHECK, trigger và index bổ sung nằm trong migration SQL để tránh drift.
 
 ## 4.6. Quy ước xóa
 
@@ -530,6 +582,8 @@ DonDatTruoc:
 - [ ] `DonHang` có `DA_HOAN_TIEN`; hủy đơn đã thanh toán đi qua `CHO_HOAN_TIEN`.
 - [ ] `DonHang.khach_hang_id`, `nhan_vien_id`, `ThanhToan`, `ChiTietDonHang`, `LichSu*` dùng `RESTRICT`.
 - [ ] Kiểm tra voucher dùng `ngay_ket_thuc`.
-- [ ] Một migration SQL thủ công cho partial unique, exclusion, CHECK, trigger, index.
+- [ ] `ChiTietPhieuKiemKe` dùng `so_luong_he_thong` / `so_luong_thuc_te`, không có cột `so_luong`.
+- [ ] `LichSuTonKho` có CHECK tối đa một nguồn tham chiếu.
+- [ ] Hai migration SQL thủ công: `constraints` (partial unique, exclusion, CHECK, trigger, index) và bổ sung CHECK nguồn `LichSuTonKho`.
 - [ ] Không có cột trạng thái vận chuyển.
 
