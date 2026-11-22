@@ -3,6 +3,7 @@ import { errorHandler } from './middlewares/error-handler.middleware'
 import { notFoundHandler } from './middlewares/not-found.middleware'
 import { authRouter } from './routes/auth.routes'
 import { healthRouter } from './routes/health.routes'
+import { thuNghiemRouter } from './routes/thu-nghiem.routes'
 
 export function createApp() {
   const app = express()
@@ -12,6 +13,8 @@ export function createApp() {
 
   app.use('/api', healthRouter)
   app.use('/api/auth', authRouter)
+  // ⚠️ Route RBAC tạm, sẽ gỡ khi có API nghiệp vụ thật.
+  app.use('/api/thu-nghiem', thuNghiemRouter)
 
   app.use(notFoundHandler)
   app.use(errorHandler)

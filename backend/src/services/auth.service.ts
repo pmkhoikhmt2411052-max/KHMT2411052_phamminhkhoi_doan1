@@ -164,6 +164,9 @@ async function login(input: LoginInput) {
   if (!account || !passwordMatches) {
     throw new UnauthorizedError(INVALID_CREDENTIALS_MESSAGE)
   }
+
+  // Chỉ tiết lộ trạng thái khóa SAU khi mật khẩu đã đúng:
+  // sai tài khoản/sai mật khẩu (kể cả tài khoản bị khóa) vẫn trả 401 chung.
   if (account.trangThai === 'BI_KHOA') {
     throw new AppError(403, 'Tài khoản đã bị khóa. Vui lòng liên hệ cửa hàng.', 'ACCOUNT_LOCKED')
   }
