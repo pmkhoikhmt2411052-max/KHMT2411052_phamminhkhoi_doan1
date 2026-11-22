@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '../generated/prisma/client.ts'
 import type { LoaiSanPham } from '../generated/prisma/enums'
+import { roles, seedRoles } from './roles'
 const ADMIN_USERNAME = 'admin'
 const ADMIN_MA_NV = 'NV_ADMIN'
 const INITIAL_STOCK_NOTE = 'Tồn kho ban đầu (seed)'
@@ -25,29 +26,6 @@ function seedUuid(key: string): string {
     hex.slice(20, 32),
   ].join('-')
 }
-
-const roles = [
-  {
-    maVaiTro: 'ADMIN',
-    tenVaiTro: 'Quản trị viên',
-    moTa: 'Toàn quyền quản trị hệ thống',
-  },
-  {
-    maVaiTro: 'THU_NGAN',
-    tenVaiTro: 'Thu ngân',
-    moTa: 'Bán hàng tại quầy (POS)',
-  },
-  {
-    maVaiTro: 'NHAN_VIEN_KHO',
-    tenVaiTro: 'Nhân viên kho',
-    moTa: 'Quản lý nhập kho, kiểm kê và tồn kho',
-  },
-  {
-    maVaiTro: 'KHACH_HANG',
-    tenVaiTro: 'Khách hàng',
-    moTa: 'Tài khoản khách hàng mua sắm online',
-  },
-]
 
 const categories = [
   {
@@ -275,17 +253,8 @@ async function main() {
   const prisma = new PrismaClient({ adapter })
 
   try {
-    // 1. Vai trò
-    for (const role of roles) {
-      await prisma.vaiTro.upsert({
-        where: { maVaiTro: role.maVaiTro },
-        update: {
-          tenVaiTro: role.tenVaiTro,
-          moTa: role.moTa,
-        },
-        create: role,
-      })
-    }
+    // 1. Vai trò (seed dùng chung với bộ kiểm thử)
+    await seedRoles(prisma)
 
     const adminRole = await prisma.vaiTro.findUniqueOrThrow({
       where: { maVaiTro: 'ADMIN' },
