@@ -70,6 +70,71 @@ export function toSanPhamChiTietDto(sp: SanPhamBase & { thanhPhanComboCombo: Tha
   }
 }
 
+/** DTO quản trị: có cả tồn kho, ngưỡng tồn, nhà cung cấp và trạng thái. */
+type SanPhamAdmin = {
+  id: string
+  danhMucId: number
+  nhaCungCapId: number | null
+  maSp: string
+  isbn: string | null
+  tenSp: string
+  loaiSp: string
+  tacGia: string | null
+  nhaXuatBan: string | null
+  namXuatBan: number | null
+  moTa: string | null
+  hinhAnh: string | null
+  giaBan: unknown
+  soLuongTon: number
+  nguongTonToiThieu: number
+  trangThai: string
+  ngayTao: Date
+  ngayCapNhat: Date
+}
+
+export function toSanPhamAdminDto(sp: SanPhamAdmin) {
+  return {
+    id: sp.id,
+    danhMucId: sp.danhMucId,
+    nhaCungCapId: sp.nhaCungCapId,
+    maSp: sp.maSp,
+    isbn: sp.isbn,
+    tenSp: sp.tenSp,
+    loaiSp: sp.loaiSp,
+    tacGia: sp.tacGia,
+    nhaXuatBan: sp.nhaXuatBan,
+    namXuatBan: sp.namXuatBan,
+    moTa: sp.moTa,
+    hinhAnh: sp.hinhAnh,
+    giaBan: String(sp.giaBan),
+    soLuongTon: sp.soLuongTon,
+    nguongTonToiThieu: sp.nguongTonToiThieu,
+    trangThai: sp.trangThai,
+    ngayTao: sp.ngayTao,
+    ngayCapNhat: sp.ngayCapNhat,
+  }
+}
+
+export function toDanhMucAdminDto(dm: {
+  danhMucId: number
+  danhMucChaId: number | null
+  slug: string
+  tenDanhMuc: string
+  moTa: string | null
+  thuTu: number
+  trangThai: string
+}) {
+  return {
+    id: dm.danhMucId,
+    danhMucChaId: dm.danhMucChaId,
+    slug: dm.slug,
+    tenDanhMuc: dm.tenDanhMuc,
+    moTa: dm.moTa,
+    thuTu: dm.thuTu,
+    trangThai: dm.trangThai,
+  }
+}
+
 export type DanhMucNode = {
   id: number
   slug: string

@@ -83,7 +83,11 @@ async function query(options: {
   sortBy: ListSanPhamInput['sortBy']
   order: ListSanPhamInput['order']
 }) {
-  const conditions: Prisma.Sql[] = [Prisma.sql`sp."trang_thai" = 'DANG_BAN'`]
+  const conditions: Prisma.Sql[] = [
+    Prisma.sql`sp."trang_thai" = 'DANG_BAN'`,
+    // Ẩn danh mục thì sản phẩm thuộc danh mục đó cũng không hiển thị cho khách.
+    Prisma.sql`dm."trang_thai" = 'HOAT_DONG'`,
+  ]
 
   if (options.q) {
     // Tên: dịch dấu tiếng Việt ở cả hai chiều (DB và chuỗi tìm kiếm).
@@ -122,7 +126,10 @@ async function query(options: {
   `)
 
   const countRows = await prisma.$queryRaw<{ count: number }[]>(Prisma.sql`
-    SELECT COUNT(*)::int AS count FROM "SanPham" sp WHERE ${where}
+    SELECT COUNT(*)::int AS count
+    FROM "SanPham" sp
+    JOIN "DanhMuc" dm ON dm."danh_muc_id" = sp."danh_muc_id"
+    WHERE ${where}
   `)
   const total = countRows[0]?.count ?? 0
 
@@ -159,7 +166,7 @@ async function findById(id: string) {
   const sanPham = await prisma.sanPham.findUnique({
     where: { id },
     include: {
-      danhMuc: { select: { tenDanhMuc: true, slug: true } },
+      danhMuc: { select: { tenDanhMuc: true, slug: true, trangThai: true } },
       thanhPhanComboCombo: {
         where: { sanPham: { trangThai: 'DANG_BAN' } },
         include: {
@@ -178,7 +185,11 @@ async function findById(id: string) {
     },
   })
 
-  if (!sanPham || sanPham.trangThai !== 'DANG_BAN') {
+  if (
+    !sanPham ||
+    sanPham.trangThai !== 'DANG_BAN' ||
+    sanPham.danhMuc.trangThai !== 'HOAT_DONG'
+  ) {
     throw new NotFoundError('Không tìm thấy sản phẩm')
   }
   return toSanPhamChiTietDto(sanPham)

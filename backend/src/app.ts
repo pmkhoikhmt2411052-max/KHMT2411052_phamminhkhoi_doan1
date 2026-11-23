@@ -1,6 +1,8 @@
 import express from 'express'
 import { errorHandler } from './middlewares/error-handler.middleware'
 import { notFoundHandler } from './middlewares/not-found.middleware'
+import { adminDanhMucRouter } from './routes/admin-danh-muc.routes'
+import { adminSanPhamRouter } from './routes/admin-san-pham.routes'
 import { authRouter } from './routes/auth.routes'
 import { danhMucRouter } from './routes/danh-muc.routes'
 import { sanPhamRouter } from './routes/san-pham.routes'
@@ -18,6 +20,9 @@ export function createApp() {
   // UC11 — công khai.
   app.use('/api/san-pham', sanPhamRouter)
   app.use('/api/danh-muc', danhMucRouter)
+  // UC15 — quản trị, chỉ ADMIN.
+  app.use('/api/admin/danh-muc', adminDanhMucRouter)
+  app.use('/api/admin/san-pham', adminSanPhamRouter)
   // ⚠️ Route RBAC tạm, sẽ gỡ khi có API nghiệp vụ thật.
   app.use('/api/thu-nghiem', thuNghiemRouter)
 

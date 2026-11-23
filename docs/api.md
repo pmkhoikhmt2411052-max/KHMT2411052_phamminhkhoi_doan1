@@ -1,7 +1,7 @@
 # Thiết kế API — BookMark
 
-> Trạng thái: đang cài đặt (đã xong khung app, xác thực, phân quyền và API công khai UC11;
-> đang triển khai nhóm danh mục/sản phẩm).
+> Trạng thái: đang cài đặt (đã xong khung app, xác thực, phân quyền, API công khai UC11
+> và API quản trị UC15 cho danh mục/sản phẩm; chờ viết test cho nhóm này).
 > Nguồn: `docs/spec.md` mục 1.3.2, 2.8.3, 3.1.1, 3.10 và `docs/database-design.md` phần 1.
 
 ## 1. Quy ước chung
@@ -64,6 +64,14 @@ Trích từ bảng phân công use case (spec 1.3.2) và RBAC (spec 2.8.3).
 | GET | `/api/san-pham` | Public | ✓ xong (UC11) |
 | GET | `/api/san-pham/:id` | Public | ✓ xong (UC11) |
 | GET | `/api/danh-muc` | Public | ✓ xong (UC11) |
+| POST | `/api/admin/danh-muc` | `ADMIN` | ✓ xong (UC15) |
+| PATCH | `/api/admin/danh-muc/:id` | `ADMIN` | ✓ xong (UC15) |
+| POST | `/api/admin/san-pham` | `ADMIN` | ✓ xong (UC15) |
+| PATCH | `/api/admin/san-pham/:id` | `ADMIN` | ✓ xong (UC15) |
+| PUT | `/api/admin/san-pham/:id/thanh-phan` | `ADMIN` | ✓ xong (UC15) |
+
+> Mọi route `/api/admin/*` đều có `authenticate` + `requireRole('ADMIN')`:
+> không token → `401`, sai vai trò → `403`.
 
 > Các route `/api/thu-nghiem/*` chỉ để kiểm thử RBAC. **Sẽ gỡ bỏ** khi các API nghiệp vụ
 > thật (UC01–UC17) được cài đặt (ghi chú ngay trong `src/routes/thu-nghiem.routes.ts`).
@@ -98,10 +106,15 @@ Trích từ bảng phân công use case (spec 1.3.2) và RBAC (spec 2.8.3).
   | `q` | — | Tìm theo tên (có/không dấu), tác giả, `ma_sp` hoặc `isbn` |
   | `danhMucId` | — | Lọc theo danh mục **và toàn bộ danh mục con** |
   | `loaiSp` | — | `SACH`, `TRUYEN_TRANH`, `DO_DUNG_HOC_TAP`, `BO_TRUYEN`, `COMBO` |
-  | `sortBy` | `ngayTao` | `gia`, `ten`, `ngayTao` |
+  | `sort` (alias `sortBy`) | `ngayTao` | `gia`, `ten`, `ngayTao` |
   | `order` | `desc` | `asc` / `desc` |
 
-  Chỉ trả sản phẩm `DANG_BAN`. Tìm kiếm tên dùng `translate(lower(...))` ở CSDL nên khớp cả
+  **Sắp xếp:** `?sort=gia&order=asc` sắp theo `gia_ban` tăng, `?sort=ten&order=desc` sắp theo
+  `ten_sp` giảm, `?sort=ngayTao&order=desc` là mặc định. Luôn có thêm `id ASC` để ổn định
+  phân trang. Giá trị `sort` ngoài danh sách trên, `order` sai, hoặc **bất kỳ tham số lạ nào**
+  (ví dụ `?foo=bar`) → `400 VALIDATION_ERROR` thay vì bị bỏ qua.
+
+  Chỉ trả sản phẩm `DANG_BAN` thuộc danh mục `HOAT_DONG` (ẩn danh mục → ẩn cả sản phẩm). Tìm kiếm tên dùng `translate(lower(...))` ở CSDL nên khớp cả
   "Bộ truyện" và "bo truyen"; chuỗi tìm kiếm cũng được bỏ dấu trước khi tạo pattern.
 - `GET /api/san-pham/:id` → `200` chi tiết, gồm `thanhPhan` (dành cho combo/bộ truyện).
   Sản phẩm `NGUNG_BAN` hoặc id không tồn tại → `404`.
@@ -111,6 +124,28 @@ Trích từ bảng phân công use case (spec 1.3.2) và RBAC (spec 2.8.3).
 Không trả `nhaCungCapId`, `nguongTonToiThieu`, `soLuongTon` chính xác, `ngayCapNhat`.
 `giaBan` và giá thành phần luôn là **chuỗi** (NUMERIC → string nhất quán).
 
+### 3.3. Quản trị danh mục & sản phẩm (UC15)
+
+Tất cả cần `Authorization: Bearer <token>` của tài khoản `ADMIN`.
+
+- `POST /api/admin/danh-muc`: `{ slug, tenDanhMuc, moTa?, thuTu?, danhMucChaId?, trangThai? }` → `201`.
+- `PATCH /api/admin/danh-muc/:id`: các field trên (tùy chọn) → `200`.
+  Trùng `slug` → `409`; `danhMucChaId` trỏ tới chính nó hoặc một danh mục con → `400 INVALID_PARENT`.
+- `POST /api/admin/san-pham`: `{ danhMucId, maSp, tenSp, loaiSp, giaBan, ... }` → `201`.
+  `giaBan >= 0` (nhận số hoặc chuỗi thập phân, trả về chuỗi 2 chữ số). `so_luong_ton` luôn
+  khởi tạo `0`. **Không có field `soLuongTon`**: gửi field này (hoặc field lạ) → `400`.
+  Trùng `maSp` hoặc `isbn` → `409`.
+- `PATCH /api/admin/san-pham/:id`: cập nhật các field trên, kể cả `trangThai: NGUNG_BAN`
+  (ngừng bán, **không xóa cứng**). Vẫn từ chối mọi nỗ lực sửa `soLuongTon`.
+- `PUT /api/admin/san-pham/:id/thanh-phan`: `{ thanhPhan: [{ sanPhamId, soLuong }] }` → `200`.
+  Chỉ áp cho `loaiSp = COMBO | BO_TRUYEN`; thành phần phải tồn tại, `soLuong > 0`, không trùng,
+  không phải chính combo và không phải combo/bộ truyện khác. Toàn bộ thay thế nằm trong một
+  transaction. Gửi mảng rỗng để xóa sạch thành phần.
+
+DTO admin (khác DTO công khai) có thêm `soLuongTon`, `nguongTonToiThieu`, `nhaCungCapId`,
+`trangThai`, `ngayCapNhat`. Tồn kho **không** sửa được qua các API này; chỉ thay đổi qua nghiệp
+vụ nhập kho / kiểm kê / bán hàng (UC05–UC09).
+
 ## 4. Endpoint theo thiết kế 3.10 — chưa cài đặt
 
 | Module | Endpoint | Quyền theo ma trận |
@@ -118,7 +153,7 @@ Không trả `nhaCungCapId`, `nguongTonToiThieu`, `soLuongTon` chính xác, `nga
 | Auth | `GET /api/v1/users/me` | Any Role |
 | Auth | `GET /api/v1/users` | `ADMIN` (UC16) |
 | Product | ~~`GET /api/v1/products`, `GET /api/v1/products/:id`~~ | Đã cài tại `/api/san-pham` (UC11) |
-| Product | `POST /api/v1/products`, `PUT /api/v1/products/:id` | `ADMIN` (UC15) — chưa cài |
+| Product | ~~`POST /api/v1/products`, `PUT /api/v1/products/:id`~~ | Đã cài tại `/api/admin/san-pham` (UC15) |
 | Sales | `POST /api/v1/orders/pos` | `THU_NGAN` (UC05) |
 | Sales | `POST /api/v1/orders/online` | `KHACH_HANG` (UC12/14) |
 | Sales | `POST /api/v1/payment/vnpay` | `KHACH_HANG` (UC14) |
