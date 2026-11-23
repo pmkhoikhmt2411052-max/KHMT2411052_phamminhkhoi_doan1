@@ -2,6 +2,7 @@ import { nhapKhoService } from '../services/nhap-kho.service'
 import {
   chiTietSchema,
   createPhieuNhapSchema,
+  listLichSuSchema,
   listPhieuSchema,
   phieuIdParamSchema,
   sanPhamIdParamSchema,
@@ -31,8 +32,37 @@ export const nhapKhoController = {
     res.status(200).json(await nhapKhoService.list(input))
   }),
 
+  xoaChiTiet: asyncHandler(async (req, res) => {
+    const { id, sanPhamId } = {
+      ...phieuIdParamSchema.parse(req.params),
+      ...sanPhamIdParamSchema.parse(req.params),
+    }
+    res.status(200).json(await nhapKhoService.xoaChiTiet(id, sanPhamId))
+  }),
+
+  gui: asyncHandler(async (req, res) => {
+    const { id } = phieuIdParamSchema.parse(req.params)
+    res.status(200).json(await nhapKhoService.gui(id))
+  }),
+
+  huy: asyncHandler(async (req, res) => {
+    const { id } = phieuIdParamSchema.parse(req.params)
+    res.status(200).json(await nhapKhoService.huy(id))
+  }),
+
+  xacNhan: asyncHandler(async (req, res) => {
+    const { id } = phieuIdParamSchema.parse(req.params)
+    res.status(200).json(await nhapKhoService.xacNhan(id, req.authUser!.id))
+  }),
+
   chiTiet: asyncHandler(async (req, res) => {
     const { id } = phieuIdParamSchema.parse(req.params)
     res.status(200).json(await nhapKhoService.findById(id))
+  }),
+
+  lichSuTonKho: asyncHandler(async (req, res) => {
+    const { sanPhamId } = sanPhamIdParamSchema.parse(req.params)
+    const { page, pageSize } = listLichSuSchema.parse(req.query)
+    res.status(200).json(await nhapKhoService.lichSuTonKho(sanPhamId, page, pageSize))
   }),
 }

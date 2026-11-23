@@ -29,6 +29,13 @@ export const listPhieuSchema = z
   })
   .strict()
 
+export const listLichSuSchema = z
+  .object({
+    page: z.coerce.number().int().positive().default(1),
+    pageSize: z.coerce.number().int().positive().max(60).default(12),
+  })
+  .strict()
+
 export const phieuIdParamSchema = z.object({
   id: z.string().uuid(),
 })

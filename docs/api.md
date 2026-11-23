@@ -1,7 +1,7 @@
 # Thiết kế API — BookMark
 
 > Trạng thái: đang cài đặt (đã xong khung app, xác thực, phân quyền, API công khai UC11
-> và API quản trị UC15 cho danh mục/sản phẩm; đang cài đặt nhập kho UC06/UC07).
+> và API quản trị UC15 cho danh mục/sản phẩm; đã cài đặt nhập kho UC06/UC07).
 > Nguồn: `docs/spec.md` mục 1.3.2, 2.8.3, 3.1.1, 3.10 và `docs/database-design.md` phần 1.
 
 ## 1. Quy ước chung
@@ -74,6 +74,11 @@ Trích từ bảng phân công use case (spec 1.3.2) và RBAC (spec 2.8.3).
 | GET | `/api/nhap-kho/:id` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC06) |
 | POST | `/api/nhap-kho/:id/chi-tiet` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC06) |
 | PATCH | `/api/nhap-kho/:id/chi-tiet/:sanPhamId` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC06) |
+| DELETE | `/api/nhap-kho/:id/chi-tiet/:sanPhamId` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC06) |
+| POST | `/api/nhap-kho/:id/gui` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC06) |
+| POST | `/api/nhap-kho/:id/huy` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC07) |
+| POST | `/api/nhap-kho/:id/xac-nhan` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC07) |
+| GET | `/api/nhap-kho/lich-su-ton-kho/:sanPhamId` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC07) |
 
 > Mọi route `/api/admin/*` đều có `authenticate` + `requireRole('ADMIN')`:
 > không token → `401`, sai vai trò → `403`.
@@ -177,6 +182,29 @@ Chỉ `NHAN_VIEN_KHO` hoặc `ADMIN`. **Bước này chưa cộng tồn kho.**
 Chỉ chỉnh sửa được khi phiếu còn `NHAP` / `CHO_XAC_NHAN`; phiếu đã `DA_NHAP_KHO` / `DA_HUY`
 → `409`. Tiền (`giaNhap`, `thanhTien`, `tongTien`) trả về chuỗi 2 chữ số.
 
+### 3.5. Xác nhận nhập kho và sổ tồn (UC07)
+
+- `POST /api/nhap-kho/:id/gui` — `NHAP → CHO_XAC_NHAN`; phiếu phải có ít nhất 1 dòng.
+- `POST /api/nhap-kho/:id/huy` — hủy phiếu `NHAP`/`CHO_XAC_NHAN` → `DA_HUY`, **không đổi tồn**.
+  Phiếu `DA_NHAP_KHO` → `409` với thông báo rõ (không trả lỗi trigger của CSDL).
+- `POST /api/nhap-kho/:id/xac-nhan` — xác nhận trong **một transaction ACID**:
+  1. `SELECT ... FOR UPDATE` dòng phiếu, kiểm tra `CHO_XAC_NHAN`.
+  2. `SELECT ... ORDER BY id ASC FOR UPDATE` các dòng sản phẩm (tránh deadlock).
+  3. Cộng tồn từng dòng; ghi `LichSuTonKho` `loaiBienDong = NHAP_KHO` với
+     `soLuongTruoc`, `soLuongThayDoi`, `soLuongSau = truoc + thayDoi`, `phieuNhapId`,
+     `nguoiThucHienId`.
+  4. `UPDATE ... WHERE trang_thai = 'CHO_XAC_NHAN'` → `DA_NHAP_KHO` kèm
+     `nguoiXacNhanId`, `ngayXacNhan`. Nếu `affected rows = 0` → `409`.
+  Xác nhận lặp hoặc hai yêu cầu đồng thời: chỉ một yêu cầu `200`, yêu cầu còn lại `409`,
+  tồn chỉ tăng một lần. Mọi thao tác ghi khác (sửa/xóa dòng, gửi, hủy) cũng khóa phiếu
+  và kiểm tra trạng thái trong cùng transaction.
+- `GET /api/nhap-kho/lich-su-ton-kho/:sanPhamId?page=&pageSize=` — lịch sử biến động,
+  mới nhất trước.
+
+Spec UC07 không yêu cầu người xác nhận khác người lập; hệ thống ghi nhận
+`nguoi_xac_nhan_id` và `ngay_xac_nhan`. Bất biến được kiểm thử: `so_luong_ton` luôn bằng
+`tổng so_luong_thay_doi` trong `LichSuTonKho` của sản phẩm.
+
 ## 4. Endpoint theo thiết kế 3.10 — chưa cài đặt
 
 | Module | Endpoint | Quyền theo ma trận |
@@ -190,7 +218,8 @@ Chỉ chỉnh sửa được khi phiếu còn `NHAP` / `CHO_XAC_NHAN`; phiếu �
 | Sales | `POST /api/v1/payment/vnpay` | `KHACH_HANG` (UC14) |
 | Sales | `POST /api/v1/payment/callback` | Public (server-to-server) |
 | Inventory | `GET /api/v1/inventory` | `NHAN_VIEN_KHO`, `ADMIN`, `THU_NGAN` |
-| Inventory | `POST /api/v1/inventory/imports`, `POST /api/v1/inventory/checks` | `NHAN_VIEN_KHO` (UC06/08) |
+| Inventory | `POST /api/v1/inventory/imports` | Đã cài tại `/api/nhap-kho` (UC06/07) |
+| Inventory | `POST /api/v1/inventory/checks` | `NHAN_VIEN_KHO` (UC08) — chưa cài |
 | Inventory | `PUT /api/v1/inventory/checks/:id` | `ADMIN` (UC09) |
 | Report | `GET /api/v1/reports/revenue` | `ADMIN` (UC17) |
 
