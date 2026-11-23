@@ -1,9 +1,13 @@
 import { spawnSync } from 'node:child_process'
+import dotenv from 'dotenv'
 import { Client } from 'pg'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '../generated/prisma/client.ts'
 import { seedRoles } from '../prisma/roles'
 import { getTestDatabaseName, getTestDatabaseUrl } from './support/test-db-url'
+
+// Tự nạp backend/.env (không in nội dung). dotenv không ghi đè biến đã có.
+dotenv.config({ quiet: true })
 
 function redact(text: string | undefined, secrets: string[]): string {
   let result = text ?? ''
@@ -13,6 +17,18 @@ function redact(text: string | undefined, secrets: string[]): string {
 
 /** Chạy một lần trước toàn bộ test: tạo CSDL test, migrate, seed 4 vai trò. */
 export async function setup(): Promise<void> {
+  // Nếu chưa đặt tay, suy ra bookmark_test từ DATABASE_URL trong .env.
+  if (!process.env.TEST_DATABASE_URL) {
+    const baseUrl = process.env.DATABASE_URL
+    if (!baseUrl) {
+      throw new Error('Thiếu TEST_DATABASE_URL và DATABASE_URL để suy ra CSDL test.')
+    }
+    const derived = new URL(baseUrl)
+    derived.pathname = '/bookmark_test'
+    process.env.TEST_DATABASE_URL = derived.toString()
+  }
+
+  // getTestDatabaseUrl vẫn kiểm tra: phải có biến và tên phải kết thúc _test.
   const testUrl = getTestDatabaseUrl()
   const dbName = getTestDatabaseName(testUrl)
 

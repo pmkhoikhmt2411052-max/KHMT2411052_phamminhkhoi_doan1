@@ -1,6 +1,7 @@
 # Thiết kế API — BookMark
 
-> Trạng thái: đang cài đặt (mới đến bước 3/4: khung app → xác thực → phân quyền).
+> Trạng thái: đang cài đặt (đã xong khung app, xác thực, phân quyền và API công khai UC11;
+> đang triển khai nhóm danh mục/sản phẩm).
 > Nguồn: `docs/spec.md` mục 1.3.2, 2.8.3, 3.1.1, 3.10 và `docs/database-design.md` phần 1.
 
 ## 1. Quy ước chung
@@ -60,6 +61,9 @@ Trích từ bảng phân công use case (spec 1.3.2) và RBAC (spec 2.8.3).
 | GET | `/api/thu-nghiem/nhan-vien-kho` | `NHAN_VIEN_KHO` | ✓ xong — **route tạm** |
 | GET | `/api/thu-nghiem/khach-hang` | `KHACH_HANG` | ✓ xong — **route tạm** |
 | GET | `/api/thu-nghiem/nhieu-vai-tro` | `ADMIN`, `THU_NGAN`, `NHAN_VIEN_KHO` | ✓ xong — **route tạm** |
+| GET | `/api/san-pham` | Public | ✓ xong (UC11) |
+| GET | `/api/san-pham/:id` | Public | ✓ xong (UC11) |
+| GET | `/api/danh-muc` | Public | ✓ xong (UC11) |
 
 > Các route `/api/thu-nghiem/*` chỉ để kiểm thử RBAC. **Sẽ gỡ bỏ** khi các API nghiệp vụ
 > thật (UC01–UC17) được cài đặt (ghi chú ngay trong `src/routes/thu-nghiem.routes.ts`).
@@ -82,14 +86,39 @@ Trích từ bảng phân công use case (spec 1.3.2) và RBAC (spec 2.8.3).
 - Tài khoản `BI_KHOA` → `403` **chỉ sau khi mật khẩu đã đúng**; nếu mật khẩu sai thì vẫn trả `401` chung.
 - Không endpoint nào trả `password_hash`.
 
+### 3.2. Danh mục & sản phẩm công khai (UC11)
+
+- `GET /api/danh-muc` → `200 [ { id, slug, tenDanhMuc, moTa, thuTu, danhMucChaId, con: [...] } ]`.
+  Chỉ trả danh mục `HOAT_DONG`, xếp theo `thuTu` rồi `id`; `con` là cây cha–con.
+- `GET /api/san-pham` → `200 { data: [...], pagination: { page, pageSize, total, totalPages } }`.
+
+  | Query | Mặc định | Mô tả |
+  |---|---|---|
+  | `page`, `pageSize` | `1`, `12` (tối đa 60) | Phân trang |
+  | `q` | — | Tìm theo tên (có/không dấu), tác giả, `ma_sp` hoặc `isbn` |
+  | `danhMucId` | — | Lọc theo danh mục **và toàn bộ danh mục con** |
+  | `loaiSp` | — | `SACH`, `TRUYEN_TRANH`, `DO_DUNG_HOC_TAP`, `BO_TRUYEN`, `COMBO` |
+  | `sortBy` | `ngayTao` | `gia`, `ten`, `ngayTao` |
+  | `order` | `desc` | `asc` / `desc` |
+
+  Chỉ trả sản phẩm `DANG_BAN`. Tìm kiếm tên dùng `translate(lower(...))` ở CSDL nên khớp cả
+  "Bộ truyện" và "bo truyen"; chuỗi tìm kiếm cũng được bỏ dấu trước khi tạo pattern.
+- `GET /api/san-pham/:id` → `200` chi tiết, gồm `thanhPhan` (dành cho combo/bộ truyện).
+  Sản phẩm `NGUNG_BAN` hoặc id không tồn tại → `404`.
+
+**DTO công khai** chỉ gồm: `id`, `maSp`, `isbn`, `tenSp`, `loaiSp`, `tacGia`, `nhaXuatBan`,
+`namXuatBan`, `moTa`, `hinhAnh`, `giaBan`, `conHang`, `ngayTao`, `danhMuc`.
+Không trả `nhaCungCapId`, `nguongTonToiThieu`, `soLuongTon` chính xác, `ngayCapNhat`.
+`giaBan` và giá thành phần luôn là **chuỗi** (NUMERIC → string nhất quán).
+
 ## 4. Endpoint theo thiết kế 3.10 — chưa cài đặt
 
 | Module | Endpoint | Quyền theo ma trận |
 |---|---|---|
 | Auth | `GET /api/v1/users/me` | Any Role |
 | Auth | `GET /api/v1/users` | `ADMIN` (UC16) |
-| Product | `GET /api/v1/products`, `GET /api/v1/products/:id` | Public (UC11) |
-| Product | `POST /api/v1/products`, `PUT /api/v1/products/:id` | `ADMIN` (UC15) |
+| Product | ~~`GET /api/v1/products`, `GET /api/v1/products/:id`~~ | Đã cài tại `/api/san-pham` (UC11) |
+| Product | `POST /api/v1/products`, `PUT /api/v1/products/:id` | `ADMIN` (UC15) — chưa cài |
 | Sales | `POST /api/v1/orders/pos` | `THU_NGAN` (UC05) |
 | Sales | `POST /api/v1/orders/online` | `KHACH_HANG` (UC12/14) |
 | Sales | `POST /api/v1/payment/vnpay` | `KHACH_HANG` (UC14) |
