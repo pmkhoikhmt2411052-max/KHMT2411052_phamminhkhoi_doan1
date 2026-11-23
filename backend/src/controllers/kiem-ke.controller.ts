@@ -5,6 +5,7 @@ import {
   kiemKeIdParamSchema,
   listKiemKeSchema,
   sanPhamIdParamSchema,
+  tuChoiSchema,
 } from '../validators/kiem-ke.validator'
 import { asyncHandler } from '../utils/async-handler'
 
@@ -36,6 +37,22 @@ export const kiemKeController = {
   danhSach: asyncHandler(async (req, res) => {
     const input = listKiemKeSchema.parse(req.query)
     res.status(200).json(await kiemKeService.list(input))
+  }),
+
+  duyet: asyncHandler(async (req, res) => {
+    const { id } = kiemKeIdParamSchema.parse(req.params)
+    res.status(200).json(await kiemKeService.duyet(id, req.authUser!.id))
+  }),
+
+  tuChoi: asyncHandler(async (req, res) => {
+    const { id } = kiemKeIdParamSchema.parse(req.params)
+    const input = tuChoiSchema.parse(req.body)
+    res.status(200).json(await kiemKeService.tuChoi(id, input))
+  }),
+
+  suaLai: asyncHandler(async (req, res) => {
+    const { id } = kiemKeIdParamSchema.parse(req.params)
+    res.status(200).json(await kiemKeService.suaLai(id))
   }),
 
   chiTiet: asyncHandler(async (req, res) => {

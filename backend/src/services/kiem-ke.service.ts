@@ -7,6 +7,7 @@ import type {
   ChiTietKiemKeInput,
   CreateKiemKeInput,
   ListKiemKeInput,
+  TuChoiInput,
 } from '../validators/kiem-ke.validator'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
@@ -17,11 +18,27 @@ function generateMaPkk(): string {
   return `PKK-${date}-${randomUUID().slice(0, 6).toUpperCase()}`
 }
 
-async function lockPhieu(tx: Tx, id: string): Promise<{ id: string; trangThai: string } | null> {
-  const rows = await tx.$queryRaw<{ id: string; trangThai: string }[]>(Prisma.sql`
-    SELECT "id", "trang_thai" AS "trangThai" FROM "PhieuKiemKe" WHERE "id" = ${id} FOR UPDATE
+async function lockPhieu(
+  tx: Tx,
+  id: string,
+): Promise<{ id: string; trangThai: string; danhMucId: number | null } | null> {
+  const rows = await tx.$queryRaw<{ id: string; trangThai: string; danhMucId: number | null }[]>(Prisma.sql`
+    SELECT "id", "trang_thai" AS "trangThai", "danh_muc_id" AS "danhMucId"
+    FROM "PhieuKiemKe" WHERE "id" = ${id} FOR UPDATE
   `)
   return rows[0] ?? null
+}
+
+/** Khóa sản phẩm theo id tăng dần để tránh deadlock. */
+async function lockSanPhams(tx: Tx, ids: string[]) {
+  const rows = await tx.$queryRaw<{ id: string; maSp: string; soLuongTon: number }[]>(Prisma.sql`
+    SELECT "id", "ma_sp" AS "maSp", "so_luong_ton" AS "soLuongTon"
+    FROM "SanPham"
+    WHERE "id" IN (${Prisma.join(ids)})
+    ORDER BY "id" ASC
+    FOR UPDATE
+  `)
+  return new Map(rows.map((row) => [row.id, row]))
 }
 
 /** Exclusion constraint chỉ xét phiếu NHAP/CHO_DUYET; NULL phủ mọi phạm vi. */
@@ -163,6 +180,108 @@ async function huy(phieuId: string) {
   return findById(phieuId)
 }
 
+/** UC09 — ADMIN duyệt: cộng chênh lệch vào tồn hiện tại, không gán đè. */
+async function duyet(phieuId: string, taiKhoanId: string) {
+  const id = await prisma.$transaction(async (tx) => {
+    const phieu = await lockPhieu(tx, phieuId)
+    if (!phieu) throw new NotFoundError('Không tìm thấy phiếu kiểm kê')
+    if (phieu.trangThai !== 'CHO_DUYET') {
+      throw new ConflictError('Phiếu không ở trạng thái chờ duyệt (có thể đã được xử lý)')
+    }
+
+    const lines = await tx.chiTietPhieuKiemKe.findMany({
+      where: { phieuKiemKeId: phieuId },
+      orderBy: { sanPhamId: 'asc' },
+    })
+    if (lines.length === 0) throw new ConflictError('Phiếu không có dòng để duyệt')
+
+    const products = await lockSanPhams(tx, lines.map((line) => line.sanPhamId))
+    if (products.size !== lines.length) {
+      throw new NotFoundError('Sản phẩm trong phiếu không còn tồn tại')
+    }
+
+    // Kiểm tra trước toàn bộ: chỉ cần một dòng âm là hủy cả giao dịch.
+    for (const line of lines) {
+      const product = products.get(line.sanPhamId)!
+      if (product.soLuongTon + line.chenhLech < 0) {
+        throw new ConflictError(`Tồn kho sau kiểm kê bị âm cho sản phẩm ${product.maSp}`)
+      }
+    }
+
+    const nguoiDuyetId = await nhanVienIdOf(tx, taiKhoanId)
+    for (const line of lines) {
+      if (line.chenhLech === 0) continue
+      const product = products.get(line.sanPhamId)!
+      const updated = await tx.sanPham.update({
+        where: { id: line.sanPhamId },
+        data: { soLuongTon: { increment: line.chenhLech } },
+        select: { soLuongTon: true },
+      })
+      await tx.lichSuTonKho.create({
+        data: {
+          sanPhamId: line.sanPhamId,
+          nguoiThucHienId: nguoiDuyetId,
+          phieuKiemKeId: phieuId,
+          loaiBienDong: 'KIEM_KE',
+          soLuongThayDoi: line.chenhLech,
+          soLuongTruoc: product.soLuongTon,
+          soLuongSau: updated.soLuongTon,
+        },
+      })
+    }
+
+    const result = await tx.phieuKiemKe.updateMany({
+      where: { id: phieuId, trangThai: 'CHO_DUYET' },
+      data: { trangThai: 'DA_DUYET', nguoiDuyetId, ngayDuyet: new Date() },
+    })
+    if (result.count !== 1) throw new ConflictError('Phiếu đã được duyệt bởi yêu cầu khác')
+    return phieuId
+  })
+  return findById(id)
+}
+
+/** UC09 — ADMIN từ chối: bắt buộc lý do, không đổi tồn. */
+async function tuChoi(phieuId: string, input: TuChoiInput) {
+  await prisma.$transaction(async (tx) => {
+    const phieu = await lockPhieu(tx, phieuId)
+    if (!phieu) throw new NotFoundError('Không tìm thấy phiếu kiểm kê')
+    if (phieu.trangThai !== 'CHO_DUYET') {
+      throw new ConflictError('Phiếu không ở trạng thái chờ duyệt (có thể đã được xử lý)')
+    }
+    const result = await tx.phieuKiemKe.updateMany({
+      where: { id: phieuId, trangThai: 'CHO_DUYET' },
+      data: { trangThai: 'TU_CHOI', lyDoTuChoi: input.lyDoTuChoi },
+    })
+    if (result.count !== 1) throw new ConflictError('Trạng thái phiếu đã thay đổi')
+  })
+  return findById(phieuId)
+}
+
+/** TU_CHOI → NHAP để nhân viên kho sửa và gửi lại. */
+async function suaLai(phieuId: string) {
+  try {
+    await prisma.$transaction(async (tx) => {
+      const phieu = await lockPhieu(tx, phieuId)
+      if (!phieu) throw new NotFoundError('Không tìm thấy phiếu kiểm kê')
+      if (phieu.trangThai !== 'TU_CHOI') {
+        throw new ConflictError('Chỉ phiếu bị từ chối mới được chuyển về nháp')
+      }
+      await assertScopeAvailable(tx, phieu.danhMucId, phieuId)
+      const result = await tx.phieuKiemKe.updateMany({
+        where: { id: phieuId, trangThai: 'TU_CHOI' },
+        data: { trangThai: 'NHAP', lyDoTuChoi: null },
+      })
+      if (result.count !== 1) throw new ConflictError('Trạng thái phiếu đã thay đổi')
+    })
+  } catch (error) {
+    if (isExclusionViolation(error)) {
+      throw new ConflictError('Đã có phiếu kiểm kê đang mở trùng phạm vi')
+    }
+    throw error
+  }
+  return findById(phieuId)
+}
+
 const INCLUDE = {
   danhMuc: { select: { tenDanhMuc: true } },
   nguoiLap: { select: { id: true, maNv: true, hoTen: true } },
@@ -202,4 +321,4 @@ async function findById(id: string) {
   return toPhieuKiemKeDto(phieu)
 }
 
-export const kiemKeService = { create, capNhatThucTe, gui, huy, list, findById }
+export const kiemKeService = { create, capNhatThucTe, gui, huy, duyet, tuChoi, suaLai, list, findById }

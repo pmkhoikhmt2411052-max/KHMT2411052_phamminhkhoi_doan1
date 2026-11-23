@@ -2,7 +2,7 @@
 
 > Trạng thái: đang cài đặt (đã xong khung app, xác thực, phân quyền, API công khai UC11
 > và API quản trị UC15 cho danh mục/sản phẩm; đã cài đặt nhập kho UC06/UC07
-> và đang cài đặt kiểm kê UC08/UC09).
+> và đã cài đặt kiểm kê UC08/UC09).
 > Nguồn: `docs/spec.md` mục 1.3.2, 2.8.3, 3.1.1, 3.10 và `docs/database-design.md` phần 1.
 
 ## 1. Quy ước chung
@@ -86,6 +86,9 @@ Trích từ bảng phân công use case (spec 1.3.2) và RBAC (spec 2.8.3).
 | PATCH | `/api/kiem-ke/:id/chi-tiet/:sanPhamId` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC08) |
 | POST | `/api/kiem-ke/:id/gui` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC08) |
 | POST | `/api/kiem-ke/:id/huy` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC08) |
+| POST | `/api/kiem-ke/:id/sua-lai` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC09) |
+| POST | `/api/kiem-ke/:id/duyet` | `ADMIN` | ✓ xong (UC09) |
+| POST | `/api/kiem-ke/:id/tu-choi` | `ADMIN` | ✓ xong (UC09) |
 
 > Mọi route `/api/admin/*` đều có `authenticate` + `requireRole('ADMIN')`:
 > không token → `401`, sai vai trò → `403`.
@@ -232,6 +235,28 @@ Chỉ `NHAN_VIEN_KHO` hoặc `ADMIN`.
 - `POST /api/kiem-ke/:id/huy`: hủy phiếu `NHAP`/`CHO_DUYET` → `DA_HUY`, không đổi tồn.
 - `GET /api/kiem-ke`, `GET /api/kiem-ke/:id`: danh sách (lọc `trangThai`, phân trang) và chi tiết.
 
+### 3.7. Kiểm kê — duyệt / từ chối (UC09)
+
+- `POST /api/kiem-ke/:id/duyet` — **chỉ ADMIN**. Trong một transaction ACID:
+  1. `SELECT ... FOR UPDATE` dòng phiếu, kiểm tra `CHO_DUYET`.
+  2. Khóa sản phẩm `ORDER BY id ASC FOR UPDATE`.
+  3. Kiểm tra trước toàn bộ: `tồn hiện tại + chenh_lech < 0` → `409` nêu rõ `maSp`,
+     rollback toàn bộ (không đổi tồn, không ghi sổ).
+  4. `so_luong_ton += chenh_lech` (**không gán đè**, vì có thể có nhập kho/bán hàng xen giữa).
+     Dòng `chenh_lech = 0` **không ghi** `LichSuTonKho`.
+  5. Ghi `LichSuTonKho` `loaiBienDong = KIEM_KE`, `phieuKiemKeId`, `nguoiThucHienId`,
+     `soLuongTruoc / soLuongThayDoi / soLuongSau` đúng công thức.
+  6. `UPDATE ... WHERE trang_thai = 'CHO_DUYET'` → `DA_DUYET` kèm `nguoiDuyetId`, `ngayDuyet`;
+     `affected rows = 0` → `409`. Duyệt lặp/đồng thời chỉ áp dụng một lần.
+- `POST /api/kiem-ke/:id/tu-choi` — **chỉ ADMIN**, body `{ lyDoTuChoi }` bắt buộc không rỗng
+  (`400` nếu thiếu). Không đổi tồn; phiếu → `TU_CHOI`.
+- `POST /api/kiem-ke/:id/sua-lai` — `TU_CHOI → NHAP` (xóa lý do) để nhân viên kho sửa và gửi lại;
+  kiểm tra lại chồng phạm vi vì phiếu mở lại có thể trùng phiếu khác.
+- Phiếu `DA_DUYET` không đổi trạng thái được nữa; mọi thao tác chuyển trạng thái trả `409`
+  rõ ràng, không để lộ lỗi trigger `PhieuKiemKe_chan_doi_trang_thai_sau_duyet`.
+- Spec UC09 **không cấm** ADMIN tự lập rồi tự duyệt phiếu; hệ thống cho phép và ghi nhận
+  `nguoi_lap_id`, `nguoi_duyet_id` riêng biệt.
+
 ## 4. Endpoint theo thiết kế 3.10 — chưa cài đặt
 
 | Module | Endpoint | Quyền theo ma trận |
@@ -246,8 +271,8 @@ Chỉ `NHAN_VIEN_KHO` hoặc `ADMIN`.
 | Sales | `POST /api/v1/payment/callback` | Public (server-to-server) |
 | Inventory | `GET /api/v1/inventory` | `NHAN_VIEN_KHO`, `ADMIN`, `THU_NGAN` |
 | Inventory | `POST /api/v1/inventory/imports` | Đã cài tại `/api/nhap-kho` (UC06/07) |
-| Inventory | `POST /api/v1/inventory/checks` | `NHAN_VIEN_KHO` (UC08) — chưa cài |
-| Inventory | `PUT /api/v1/inventory/checks/:id` | `ADMIN` (UC09) |
+| Inventory | `POST /api/v1/inventory/checks` | Đã cài tại `/api/kiem-ke` (UC08) |
+| Inventory | `PUT /api/v1/inventory/checks/:id` | Đã cài tại `/api/kiem-ke/:id/duyet` và `/tu-choi` (UC09) |
 | Report | `GET /api/v1/reports/revenue` | `ADMIN` (UC17) |
 
 > Phần này là căn cứ để gắn `requireRole` khi cài đặt từng API thật.
