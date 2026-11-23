@@ -2,7 +2,7 @@
 
 > Trạng thái: đang cài đặt (đã xong khung app, xác thực, phân quyền, API công khai UC11
 > và API quản trị UC15 cho danh mục/sản phẩm; đã cài đặt nhập kho UC06/UC07
-> và đã cài đặt kiểm kê UC08/UC09).
+> và đã cài đặt kiểm kê UC08/UC09; đang cài đặt POS UC02/UC04/UC05).
 > Nguồn: `docs/spec.md` mục 1.3.2, 2.8.3, 3.1.1, 3.10 và `docs/database-design.md` phần 1.
 
 ## 1. Quy ước chung
@@ -89,6 +89,8 @@ Trích từ bảng phân công use case (spec 1.3.2) và RBAC (spec 2.8.3).
 | POST | `/api/kiem-ke/:id/sua-lai` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC09) |
 | POST | `/api/kiem-ke/:id/duyet` | `ADMIN` | ✓ xong (UC09) |
 | POST | `/api/kiem-ke/:id/tu-choi` | `ADMIN` | ✓ xong (UC09) |
+| GET | `/api/pos/san-pham` | `THU_NGAN`, `ADMIN` | ✓ xong (UC02) |
+| POST | `/api/pos/bao-gia` | `THU_NGAN`, `ADMIN` | ✓ xong (UC04) |
 
 > Mọi route `/api/admin/*` đều có `authenticate` + `requireRole('ADMIN')`:
 > không token → `401`, sai vai trò → `403`.
@@ -256,6 +258,46 @@ Chỉ `NHAN_VIEN_KHO` hoặc `ADMIN`.
   rõ ràng, không để lộ lỗi trigger `PhieuKiemKe_chan_doi_trang_thai_sau_duyet`.
 - Spec UC09 **không cấm** ADMIN tự lập rồi tự duyệt phiếu; hệ thống cho phép và ghi nhận
   `nguoi_lap_id`, `nguoi_duyet_id` riêng biệt.
+
+### 3.8. POS — quy tắc đã xác nhận (bước 0)
+
+- **Tích điểm:** 1 điểm / 10.000đ trên `tong_tien`, làm tròn xuống. **Dùng điểm:** 1 điểm = 100đ.
+  Hai hằng số nằm trong `src/config/pos.ts`, lấy từ env `POS_DIEM_MOI_TIEN`, `POS_GIA_TRI_DIEM`.
+- **Tiền:** mọi phép tính dùng Decimal (decimal.js), không dùng số thực; voucher phần trăm
+  làm tròn về đồng nguyên (half-up); phản hồi luôn là chuỗi 2 chữ số thập phân.
+- **Điểm:** client gửi `diemSuDung`; server trả `400` nếu vượt số dư hoặc vượt phần tiền còn lại
+  sau voucher. Báo giá trả thêm `diemToiDa`. Khách `BI_KHOA` không dùng điểm và không được cộng điểm.
+- **Voucher phần trăm:** `gia_tri` phải trong 0–100 (kiểm tra khi tính; sẽ kiểm cả ở API tạo voucher khi có).
+- **Idempotency (cho bước 2):** `ma_giao_dich = "POS-" + khóa client`; cùng khóa + cùng nội dung → trả đơn cũ;
+  cùng khóa + nội dung khác → `409`; bắt `P2002` trong transaction.
+- **Múi giờ:** `Asia/Ho_Chi_Minh` (env `POS_TIMEZONE`) cho `ma_dh` và so sánh ngày voucher.
+- **Khách:** gửi cả `khachHangId` và `sdt` mà không cùng một khách → `400`.
+- **Nhân viên `DA_NGHI`** bị chặn dùng POS (`requireActiveStaff` áp cho mọi route `/api/pos/*`).
+- **Ngoài phạm vi bước này:** hủy / hoàn đơn POS (sẽ làm sau nếu có yêu cầu).
+
+### 3.9. POS — tra cứu & báo giá (UC02/UC04, bước 1)
+
+Chỉ `THU_NGAN` hoặc `ADMIN`. **Không ghi gì vào CSDL.**
+
+- `GET /api/pos/san-pham?q=&danhMucId=&page=&pageSize=` — tra theo tên (có/không dấu),
+  `ma_sp` hoặc `isbn` (coi isbn là barcode sách); chỉ `DANG_BAN`; trả cả `soLuongTon`.
+- `POST /api/pos/bao-gia`:
+  ```json
+  {
+    "chiTiet": [{ "sanPhamId": "uuid", "soLuong": 1 }],
+    "maVoucher": "string?",
+    "diemSuDung": 0,
+    "khachHangId": "uuid?",
+    "sdt": "string?"
+  }
+  ```
+  Trả: `chiTiet` (mỗi dòng có `donGia`, `thanhTien`, `duTon`), `tienHang`, `tienGiamVoucher`,
+  `tienGiamDiem`, `tongTien`, `diemSuDung`, `diemToiDa`, `diemCong`, `voucher`, `khachHang`.
+  - Giá luôn lấy từ `SanPham.gia_ban` ở server; dòng trùng sản phẩm được gộp số lượng.
+  - Voucher kiểm đủ 7 điều kiện (trạng thái, ngày bắt đầu/kết thúc, hạn mức, giới hạn mỗi khách,
+    kênh, giá trị đơn tối thiểu, giảm tối đa). Thứ tự: **voucher trước, điểm sau**.
+  - `diemToiDa = min(diemTichLuy, floor((tienHang - giamVoucher) / giaTriDiem))`.
+  - `diemCong = floor(tongTien / diemMoiTien)` (0 nếu không khách hoặc khách bị khóa).
 
 ## 4. Endpoint theo thiết kế 3.10 — chưa cài đặt
 

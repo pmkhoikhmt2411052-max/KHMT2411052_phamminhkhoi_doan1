@@ -10,6 +10,7 @@ import { healthRouter } from './routes/health.routes'
 import { adminKiemKeRouter } from './routes/admin-kiem-ke.routes'
 import { kiemKeRouter } from './routes/kiem-ke.routes'
 import { nhapKhoRouter } from './routes/nhap-kho.routes'
+import { posRouter } from './routes/pos.routes'
 import { thuNghiemRouter } from './routes/thu-nghiem.routes'
 
 export function createApp() {
@@ -31,6 +32,8 @@ export function createApp() {
   // UC08 — kiểm kê.
   app.use('/api/kiem-ke', kiemKeRouter)
   app.use('/api/kiem-ke', adminKiemKeRouter)
+  // UC02/UC04 — POS tra cứu & báo giá.
+  app.use('/api/pos', posRouter)
   // ⚠️ Route RBAC tạm, sẽ gỡ khi có API nghiệp vụ thật.
   app.use('/api/thu-nghiem', thuNghiemRouter)
 
