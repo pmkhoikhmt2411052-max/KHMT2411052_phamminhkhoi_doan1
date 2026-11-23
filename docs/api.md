@@ -1,7 +1,8 @@
 # Thiết kế API — BookMark
 
 > Trạng thái: đang cài đặt (đã xong khung app, xác thực, phân quyền, API công khai UC11
-> và API quản trị UC15 cho danh mục/sản phẩm; đã cài đặt nhập kho UC06/UC07).
+> và API quản trị UC15 cho danh mục/sản phẩm; đã cài đặt nhập kho UC06/UC07
+> và đang cài đặt kiểm kê UC08/UC09).
 > Nguồn: `docs/spec.md` mục 1.3.2, 2.8.3, 3.1.1, 3.10 và `docs/database-design.md` phần 1.
 
 ## 1. Quy ước chung
@@ -79,6 +80,12 @@ Trích từ bảng phân công use case (spec 1.3.2) và RBAC (spec 2.8.3).
 | POST | `/api/nhap-kho/:id/huy` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC07) |
 | POST | `/api/nhap-kho/:id/xac-nhan` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC07) |
 | GET | `/api/nhap-kho/lich-su-ton-kho/:sanPhamId` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC07) |
+| GET | `/api/kiem-ke` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC08) |
+| POST | `/api/kiem-ke` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC08) |
+| GET | `/api/kiem-ke/:id` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC08) |
+| PATCH | `/api/kiem-ke/:id/chi-tiet/:sanPhamId` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC08) |
+| POST | `/api/kiem-ke/:id/gui` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC08) |
+| POST | `/api/kiem-ke/:id/huy` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC08) |
 
 > Mọi route `/api/admin/*` đều có `authenticate` + `requireRole('ADMIN')`:
 > không token → `401`, sai vai trò → `403`.
@@ -204,6 +211,26 @@ Chỉ chỉnh sửa được khi phiếu còn `NHAP` / `CHO_XAC_NHAN`; phiếu �
 Spec UC07 không yêu cầu người xác nhận khác người lập; hệ thống ghi nhận
 `nguoi_xac_nhan_id` và `ngay_xac_nhan`. Bất biến được kiểm thử: `so_luong_ton` luôn bằng
 `tổng so_luong_thay_doi` trong `LichSuTonKho` của sản phẩm.
+
+### 3.6. Kiểm kê — lập phiếu (UC08, bước 1)
+
+Chỉ `NHAN_VIEN_KHO` hoặc `ADMIN`.
+
+- `POST /api/kiem-ke`: `{ "danhMucId": null | 1, "ghiChu": "string?" }` → `201`.
+  - `danhMucId = null` → phạm vi **toàn cửa hàng**.
+  - `danhMucId = X` → phạm vi **đúng danh mục X, không gồm danh mục con**.
+    Spec không nêu rõ có gồm con hay không; đây là lựa chọn đơn giản và được ghi nhận tại đây.
+  - Hệ thống chụp `so_luong_he_thong` từ tồn hiện tại của mọi sản phẩm trong phạm vi;
+    `so_luong_thuc_te` khởi tạo bằng số hệ thống (`chenh_lech = 0`), nhân viên kho nhập lại.
+    Phạm vi không có sản phẩm → `400 EMPTY_SCOPE`. `maPkk` tự sinh `PKK-yyyyMMdd-XXXXXX`.
+  - Trùng phạm vi với phiếu đang mở (`NHAP`/`CHO_DUYET`, kể cả toàn cửa hàng) → `409`
+    với thông báo rõ; API bắt cả lỗi exclusion constraint `PhieuKiemKe_khong_chong_pham_vi`
+    để không lộ lỗi CSDL.
+- `PATCH /api/kiem-ke/:id/chi-tiet/:sanPhamId`: `{ soLuongThucTe, ghiChu? }` →
+  `chenhLech = soLuongThucTe - soLuongHeThong`. Chỉ khi phiếu còn `NHAP`.
+- `POST /api/kiem-ke/:id/gui`: `NHAP → CHO_DUYET`, ghi `ngayGui`.
+- `POST /api/kiem-ke/:id/huy`: hủy phiếu `NHAP`/`CHO_DUYET` → `DA_HUY`, không đổi tồn.
+- `GET /api/kiem-ke`, `GET /api/kiem-ke/:id`: danh sách (lọc `trangThai`, phân trang) và chi tiết.
 
 ## 4. Endpoint theo thiết kế 3.10 — chưa cài đặt
 
