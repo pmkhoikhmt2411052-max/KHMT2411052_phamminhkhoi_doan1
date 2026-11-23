@@ -1,5 +1,5 @@
 /** NUMERIC luôn trả về chuỗi có đúng 2 chữ số thập phân. */
-function formatMoney(value: unknown): string {
+export function formatMoney(value: unknown): string {
   if (typeof value === 'number') return value.toFixed(2)
   if (typeof value === 'string') {
     const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value.trim())

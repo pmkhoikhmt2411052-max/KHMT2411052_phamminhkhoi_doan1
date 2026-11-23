@@ -1,7 +1,7 @@
 # Thiết kế API — BookMark
 
 > Trạng thái: đang cài đặt (đã xong khung app, xác thực, phân quyền, API công khai UC11
-> và API quản trị UC15 cho danh mục/sản phẩm; chờ viết test cho nhóm này).
+> và API quản trị UC15 cho danh mục/sản phẩm; đang cài đặt nhập kho UC06/UC07).
 > Nguồn: `docs/spec.md` mục 1.3.2, 2.8.3, 3.1.1, 3.10 và `docs/database-design.md` phần 1.
 
 ## 1. Quy ước chung
@@ -26,8 +26,8 @@ Trích từ bảng phân công use case (spec 1.3.2) và RBAC (spec 2.8.3).
 | UC03 | Thêm vào giỏ hàng POS | — | ✓ | — | — | Kiểm tra tồn kho |
 | UC04 | Áp dụng voucher / Tích điểm | — | ✓ | — | — | — |
 | UC05 | Thanh toán và In hóa đơn | — | ✓ | — | — | Giao dịch transaction |
-| UC06 | Lập phiếu nhập kho | — | — | ✓ | — | Chưa đổi tồn |
-| UC07 | Cập nhật tồn kho | — | — | ✓ | — | Xác nhận phiếu mới cộng tồn |
+| UC06 | Lập phiếu nhập kho | — | — | ✓ | ✓* | Chưa đổi tồn; *ADMIN được phép theo yêu cầu dự án |
+| UC07 | Cập nhật tồn kho | — | — | ✓ | ✓* | Xác nhận phiếu mới cộng tồn; *ADMIN được phép theo yêu cầu dự án |
 | UC08 | Lập phiếu kiểm kê | — | — | ✓ | — | Gửi chờ Admin duyệt |
 | UC09 | Duyệt phiếu kiểm kê | — | — | — | ✓ | Duyệt mới điều chỉnh tồn |
 | UC10 | Đăng ký / Đăng nhập | ✓ | — | — | — | Public: không cần token để lấy token |
@@ -69,6 +69,11 @@ Trích từ bảng phân công use case (spec 1.3.2) và RBAC (spec 2.8.3).
 | POST | `/api/admin/san-pham` | `ADMIN` | ✓ xong (UC15) |
 | PATCH | `/api/admin/san-pham/:id` | `ADMIN` | ✓ xong (UC15) |
 | PUT | `/api/admin/san-pham/:id/thanh-phan` | `ADMIN` | ✓ xong (UC15) |
+| GET | `/api/nhap-kho` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC06) |
+| POST | `/api/nhap-kho` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC06) |
+| GET | `/api/nhap-kho/:id` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC06) |
+| POST | `/api/nhap-kho/:id/chi-tiet` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC06) |
+| PATCH | `/api/nhap-kho/:id/chi-tiet/:sanPhamId` | `NHAN_VIEN_KHO`, `ADMIN` | ✓ xong (UC06) |
 
 > Mọi route `/api/admin/*` đều có `authenticate` + `requireRole('ADMIN')`:
 > không token → `401`, sai vai trò → `403`.
@@ -145,6 +150,32 @@ Tất cả cần `Authorization: Bearer <token>` của tài khoản `ADMIN`.
 DTO admin (khác DTO công khai) có thêm `soLuongTon`, `nguongTonToiThieu`, `nhaCungCapId`,
 `trangThai`, `ngayCapNhat`. Tồn kho **không** sửa được qua các API này; chỉ thay đổi qua nghiệp
 vụ nhập kho / kiểm kê / bán hàng (UC05–UC09).
+
+### 3.4. Phiếu nhập kho — lập phiếu (UC06, bước 1)
+
+Chỉ `NHAN_VIEN_KHO` hoặc `ADMIN`. **Bước này chưa cộng tồn kho.**
+
+- `POST /api/nhap-kho`:
+  ```json
+  {
+    "nhaCungCapId": 1,
+    "ngayNhap": "2026-11-23T00:00:00.000Z",
+    "ghiChu": "string?",
+    "trangThai": "CHO_XAC_NHAN",
+    "chiTiet": [{ "sanPhamId": "uuid", "soLuong": 2, "giaNhap": 10.5 }]
+  }
+  ```
+  `trangThai` mặc định `CHO_XAC_NHAN`; có thể chọn `NHAP` để lưu nháp. `soLuong > 0`,
+  `giaNhap >= 0`, phiếu phải có ít nhất 1 dòng, không trùng sản phẩm.
+  `maPn` tự sinh `PN-yyyyMMdd-XXXXXX`. `thanhTien = soLuong * giaNhap`,
+  `tongTien = SUM(thanhTien)` được tính lại trong cùng transaction sau mỗi thay đổi dòng.
+- `POST /api/nhap-kho/:id/chi-tiet` — thêm/cập nhật (upsert) một dòng.
+- `PATCH /api/nhap-kho/:id/chi-tiet/:sanPhamId` — sửa một dòng (404 nếu chưa có).
+- `GET /api/nhap-kho?trangThai=&page=&pageSize=` — danh sách + phân trang.
+- `GET /api/nhap-kho/:id` — chi tiết: nhà cung cấp, người lập, trạng thái, `tongTien`, các dòng.
+
+Chỉ chỉnh sửa được khi phiếu còn `NHAP` / `CHO_XAC_NHAN`; phiếu đã `DA_NHAP_KHO` / `DA_HUY`
+→ `409`. Tiền (`giaNhap`, `thanhTien`, `tongTien`) trả về chuỗi 2 chữ số.
 
 ## 4. Endpoint theo thiết kế 3.10 — chưa cài đặt
 

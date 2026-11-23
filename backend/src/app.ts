@@ -7,6 +7,7 @@ import { authRouter } from './routes/auth.routes'
 import { danhMucRouter } from './routes/danh-muc.routes'
 import { sanPhamRouter } from './routes/san-pham.routes'
 import { healthRouter } from './routes/health.routes'
+import { nhapKhoRouter } from './routes/nhap-kho.routes'
 import { thuNghiemRouter } from './routes/thu-nghiem.routes'
 
 export function createApp() {
@@ -23,6 +24,8 @@ export function createApp() {
   // UC15 — quản trị, chỉ ADMIN.
   app.use('/api/admin/danh-muc', adminDanhMucRouter)
   app.use('/api/admin/san-pham', adminSanPhamRouter)
+  // UC06/UC07 — nhập kho.
+  app.use('/api/nhap-kho', nhapKhoRouter)
   // ⚠️ Route RBAC tạm, sẽ gỡ khi có API nghiệp vụ thật.
   app.use('/api/thu-nghiem', thuNghiemRouter)
 

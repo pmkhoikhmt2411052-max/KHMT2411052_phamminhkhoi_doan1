@@ -10,7 +10,7 @@ const nullableText = (max: number) =>
     .transform((value) => (value === '' ? null : value))
 
 /** Tiền: chấp nhận số hoặc chuỗi thập phân, luôn chuẩn hóa về chuỗi 2 chữ số. */
-const money = z
+export const moneySchema = z
   .union([
     z
       .number()
@@ -34,7 +34,7 @@ export const createSanPhamSchema = z
     namXuatBan: z.number().int().nullish(),
     moTa: z.string().max(2000).nullish(),
     hinhAnh: nullableText(500),
-    giaBan: money,
+    giaBan: moneySchema,
     nguongTonToiThieu: z.number().int().nonnegative().default(0),
     trangThai: z.enum(['DANG_BAN', 'NGUNG_BAN']).default('DANG_BAN'),
   })
