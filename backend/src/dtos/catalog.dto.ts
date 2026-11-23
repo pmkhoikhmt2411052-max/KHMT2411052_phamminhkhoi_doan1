@@ -1,3 +1,16 @@
+/** NUMERIC luôn trả về chuỗi có đúng 2 chữ số thập phân. */
+function formatMoney(value: unknown): string {
+  if (typeof value === 'number') return value.toFixed(2)
+  if (typeof value === 'string') {
+    const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value.trim())
+    return match ? `${match[1]}.${(match[2] ?? '').padEnd(2, '0')}` : value
+  }
+  if (value && typeof (value as { toFixed?: unknown }).toFixed === 'function') {
+    return (value as { toFixed: (digits: number) => string }).toFixed(2)
+  }
+  return String(value)
+}
+
 /** DTO công khai: không trả nha_cung_cap_id, nguong_ton_toi_thieu, so_luong_ton, ngay_cap_nhat. */
 
 type SanPhamBase = {
@@ -30,8 +43,7 @@ export function toSanPhamPublicDto(sp: SanPhamBase) {
     namXuatBan: sp.namXuatBan,
     moTa: sp.moTa,
     hinhAnh: sp.hinhAnh,
-    // NUMERIC luôn trả về dạng chuỗi, nhất quán giữa các endpoint.
-    giaBan: String(sp.giaBan),
+    giaBan: formatMoney(sp.giaBan),
     // Khách chỉ cần biết còn hàng hay không, không cần số tồn chính xác.
     conHang: sp.soLuongTon > 0,
     ngayTao: sp.ngayTao,
@@ -63,7 +75,7 @@ export function toSanPhamChiTietDto(sp: SanPhamBase & { thanhPhanComboCombo: Tha
       maSp: tp.sanPham.maSp,
       tenSp: tp.sanPham.tenSp,
       soLuong: tp.soLuong,
-      giaBan: String(tp.sanPham.giaBan),
+      giaBan: formatMoney(tp.sanPham.giaBan),
       hinhAnh: tp.sanPham.hinhAnh,
       conHang: tp.sanPham.soLuongTon > 0,
     })),
@@ -106,7 +118,7 @@ export function toSanPhamAdminDto(sp: SanPhamAdmin) {
     namXuatBan: sp.namXuatBan,
     moTa: sp.moTa,
     hinhAnh: sp.hinhAnh,
-    giaBan: String(sp.giaBan),
+    giaBan: formatMoney(sp.giaBan),
     soLuongTon: sp.soLuongTon,
     nguongTonToiThieu: sp.nguongTonToiThieu,
     trangThai: sp.trangThai,
