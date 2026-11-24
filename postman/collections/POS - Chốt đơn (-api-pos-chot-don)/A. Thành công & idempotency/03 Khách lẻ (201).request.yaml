@@ -1,0 +1,34 @@
+$kind: http-request
+url: "{{baseUrl}}/api/pos/chot-don"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "chiTiet": [
+        {
+          "sanPhamId": "{{sanPhamId}}",
+          "soLuong": 2
+        }
+      ],
+      "diemSuDung": 0,
+      "tienKhachDua": "{{tienDuLon}}",
+      "idempotencyKey": "{{runId}}-le"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP 201', function () { pm.response.to.have.status(201); });
+      const j = pm.response.json();
+      const d = j.data || j;
+      pm.test('Có maDh, chiTiet, tienThua', function () {
+        pm.expect(d).to.have.property('maDh');
+        pm.expect(d.chiTiet).to.be.an('array').that.is.not.empty;
+        pm.expect(d).to.have.property('tienThua');
+      });
+      pm.test('maGiaoDich = POS-<khóa>', function () { pm.expect(d.thanhToan.maGiaoDich).to.eql('POS-' + pm.collectionVariables.get('runId') + '-le'); });
+    language: text/javascript
+order: 3000

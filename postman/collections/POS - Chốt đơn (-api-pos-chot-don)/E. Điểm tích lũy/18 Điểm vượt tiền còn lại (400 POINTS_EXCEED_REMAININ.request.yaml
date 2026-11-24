@@ -1,0 +1,30 @@
+$kind: http-request
+name: 18 Điểm vượt tiền còn lại (400 POINTS_EXCEED_REMAINING)
+description: "khachHangNhieuDiem: khách đủ điểm; sanPhamRe: sản phẩm giá thấp; diemVuotTien lớn hơn giá trị đơn."
+url: "{{baseUrl}}/api/pos/chot-don"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "chiTiet": [
+        {
+          "sanPhamId": "{{sanPhamRe}}",
+          "soLuong": 1
+        }
+      ],
+      "khachHangId": "{{khachHangNhieuDiem}}",
+      "diemSuDung": {{diemVuotTien}},
+      "tienKhachDua": "{{tienDuLon}}",
+      "idempotencyKey": "{{runId}}-p2"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP 400', function () { pm.response.to.have.status(400); });
+      pm.test('Có mã lỗi POINTS_EXCEED_REMAINING', function () { pm.expect(pm.response.text()).to.include('POINTS_EXCEED_REMAINING'); });
+    language: text/javascript
+order: 2000

@@ -1,0 +1,27 @@
+$kind: http-request
+description: Điền biến voucherMinDon. Mã lỗi cụ thể chưa rõ nên chỉ kiểm tra status 400 - xem response để đối chiếu mã.
+url: "{{baseUrl}}/api/pos/chot-don"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "chiTiet": [
+        {
+          "sanPhamId": "{{sanPhamId}}",
+          "soLuong": 2
+        }
+      ],
+      "maVoucher": "{{voucherMinDon}}",
+      "diemSuDung": 0,
+      "tienKhachDua": "{{tienDuLon}}",
+      "idempotencyKey": "{{runId}}-v15"
+    }
+scripts:
+  - type: afterResponse
+    code: pm.test('HTTP 400', function () { pm.response.to.have.status(400); });
+    language: text/javascript
+order: 3000

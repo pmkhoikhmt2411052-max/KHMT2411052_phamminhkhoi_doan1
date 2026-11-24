@@ -1,0 +1,30 @@
+$kind: http-request
+description: Dùng lại khóa của request 01 nhưng đổi soLuong 2 -> 3.
+url: "{{baseUrl}}/api/pos/chot-don"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "chiTiet": [
+        {
+          "sanPhamId": "{{sanPhamId}}",
+          "soLuong": 3
+        }
+      ],
+      "maVoucher": "{{voucherOk}}",
+      "diemSuDung": 5,
+      "khachHangId": "{{khachHangId}}",
+      "tienKhachDua": "{{tienDuLon}}",
+      "idempotencyKey": "{{runId}}-main"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP 409', function () { pm.response.to.have.status(409); });
+      pm.test('Có mã lỗi IDEMPOTENCY_CONFLICT', function () { pm.expect(pm.response.text()).to.include('IDEMPOTENCY_CONFLICT'); });
+    language: text/javascript
+order: 1000

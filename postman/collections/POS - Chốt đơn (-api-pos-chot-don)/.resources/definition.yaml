@@ -1,0 +1,34 @@
+$kind: collection
+name: POS - Chốt đơn (/api/pos/chot-don)
+description: |-
+  Bộ test tay cho POST /api/pos/chot-don.
+
+  Cách dùng:
+  1. Import file, mở tab Variables của collection và điền các biến (baseUrl, token, id sản phẩm/khách/voucher).
+  2. Chạy request 01 trước (sinh runId), rồi chạy tuần tự hoặc dùng Collection Runner.
+  3. Sau mỗi đơn thành công, đối chiếu DB theo mô tả ở từng request.
+
+  Test 2 request đồng thời cùng idempotencyKey không làm được bằng Postman Runner (chạy tuần tự) - dùng curl/script song song.
+variables:
+  baseUrl: http://localhost:3000
+  token: <token THU_NGAN hoặc ADMIN, nhân viên DANG_LAM>
+  runId: ""
+  maDhMain: ""
+  tienDuLon: "10000000"
+  sanPhamId: <uuid sản phẩm bán được, còn tồn>
+  sanPhamNgungBan: <uuid sản phẩm NGUNG_BAN>
+  sanPhamDanhMucAn: <uuid sản phẩm thuộc danh mục ẩn>
+  sanPhamGia0: <uuid sản phẩm giá 0đ>
+  sanPhamRe: <uuid sản phẩm giá thấp>
+  khachHangId: <uuid khách thành viên có điểm>
+  sdtKhach: <sdt của một khách thành viên>
+  khachHangBiKhoa: <uuid khách BI_KHOA>
+  khachHangItDiem: <uuid khách ít điểm>
+  khachHangNhieuDiem: <uuid khách nhiều điểm>
+  diemVuotSoDu: "0"
+  diemVuotTien: "0"
+  voucherOk: SALE10
+  voucherHetLuot: <mã voucher hết lượt>
+  voucherSaiKenh: <mã voucher không áp dụng kênh POS>
+  voucherMinDon: <mã voucher có đơn tối thiểu cao>
+  voucherHetLuotKhach: <mã voucher đã hết lượt cho khachHangId>

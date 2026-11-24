@@ -1,0 +1,27 @@
+$kind: http-request
+url: "{{baseUrl}}/api/pos/chot-don"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "chiTiet": [
+        {
+          "sanPhamId": "{{sanPhamDanhMucAn}}",
+          "soLuong": 2
+        }
+      ],
+      "diemSuDung": 0,
+      "tienKhachDua": "{{tienDuLon}}",
+      "idempotencyKey": "{{runId}}-an"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP 400', function () { pm.response.to.have.status(400); });
+      pm.test('Có mã lỗi CATEGORY_HIDDEN', function () { pm.expect(pm.response.text()).to.include('CATEGORY_HIDDEN'); });
+    language: text/javascript
+order: 4000

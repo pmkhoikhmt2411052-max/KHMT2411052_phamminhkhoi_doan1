@@ -1,0 +1,30 @@
+$kind: http-request
+description: Body phải GIỐNG HỆT request 01. Kỳ vọng 200 và cùng maDh; tồn kho/điểm/voucher không bị trừ lần 2.
+url: "{{baseUrl}}/api/pos/chot-don"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "chiTiet": [
+        {
+          "sanPhamId": "{{sanPhamId}}",
+          "soLuong": 2
+        }
+      ],
+      "maVoucher": "{{voucherOk}}",
+      "diemSuDung": 5,
+      "khachHangId": "{{khachHangId}}",
+      "tienKhachDua": "{{tienDuLon}}",
+      "idempotencyKey": "{{runId}}-main"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP 200', function () { pm.response.to.have.status(200); });
+      pm.test('Trả đúng đơn cũ', function () { const j = pm.response.json(); const d = j.data || j; pm.expect(d.maDh).to.eql(pm.collectionVariables.get('maDhMain')); });
+    language: text/javascript
+order: 2000

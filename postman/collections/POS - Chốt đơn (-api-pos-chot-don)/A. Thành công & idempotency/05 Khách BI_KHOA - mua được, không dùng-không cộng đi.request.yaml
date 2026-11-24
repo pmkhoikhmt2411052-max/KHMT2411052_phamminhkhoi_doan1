@@ -1,0 +1,38 @@
+$kind: http-request
+name: 05 Khách BI_KHOA - mua được, không dùng/không cộng điểm (201)
+description: Sau đó kiểm tra KhachHang.diemTichLuy không đổi và không có dòng LichSuDiem mới.
+url: "{{baseUrl}}/api/pos/chot-don"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "chiTiet": [
+        {
+          "sanPhamId": "{{sanPhamId}}",
+          "soLuong": 2
+        }
+      ],
+      "khachHangId": "{{khachHangBiKhoa}}",
+      "diemSuDung": 0,
+      "tienKhachDua": "{{tienDuLon}}",
+      "idempotencyKey": "{{runId}}-khoa"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP 201', function () { pm.response.to.have.status(201); });
+      const j = pm.response.json();
+      const d = j.data || j;
+      pm.test('Có maDh, chiTiet, tienThua', function () {
+        pm.expect(d).to.have.property('maDh');
+        pm.expect(d.chiTiet).to.be.an('array').that.is.not.empty;
+        pm.expect(d).to.have.property('tienThua');
+      });
+      pm.test('maGiaoDich = POS-<khóa>', function () { pm.expect(d.thanhToan.maGiaoDich).to.eql('POS-' + pm.collectionVariables.get('runId') + '-khoa'); });
+      pm.test('diemCong = 0', function () { pm.expect(Number(d.diemCong)).to.eql(0); });
+    language: text/javascript
+order: 5000

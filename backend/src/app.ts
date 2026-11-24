@@ -32,7 +32,7 @@ export function createApp() {
   // UC08 — kiểm kê.
   app.use('/api/kiem-ke', kiemKeRouter)
   app.use('/api/kiem-ke', adminKiemKeRouter)
-  // UC02/UC04 — POS tra cứu & báo giá.
+  // UC02/UC04/UC05 — POS tra cứu, báo giá & chốt đơn.
   app.use('/api/pos', posRouter)
   // ⚠️ Route RBAC tạm, sẽ gỡ khi có API nghiệp vụ thật.
   app.use('/api/thu-nghiem', thuNghiemRouter)

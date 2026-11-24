@@ -1,5 +1,5 @@
 import { posService } from '../services/pos.service'
-import { baoGiaSchema, traCuuSchema } from '../validators/pos.validator'
+import { baoGiaSchema, chotDonSchema, traCuuSchema } from '../validators/pos.validator'
 import { asyncHandler } from '../utils/async-handler'
 
 export const posController = {
@@ -11,5 +11,11 @@ export const posController = {
   baoGia: asyncHandler(async (req, res) => {
     const input = baoGiaSchema.parse(req.body)
     res.status(200).json(await posService.baoGia(input))
+  }),
+
+  chotDon: asyncHandler(async (req, res) => {
+    const input = chotDonSchema.parse(req.body)
+    const result = await posService.chotDon(input, req.authUser!.id)
+    res.status(result.replayed ? 200 : 201).json(result.invoice)
   }),
 }

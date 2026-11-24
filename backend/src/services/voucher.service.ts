@@ -2,6 +2,9 @@ import { prisma } from '../config/prisma'
 import { AppError } from '../errors/app-error'
 import { Decimal, roundToDong, toDecimal } from '../utils/money'
 
+/** Client dùng chung: prisma thường hoặc transaction client (đều có cùng model delegate). */
+type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
 function min(a: Decimal, b: Decimal): Decimal {
   return a.lessThan(b) ? a : b
 }
@@ -9,6 +12,7 @@ function min(a: Decimal, b: Decimal): Decimal {
 /**
  * Kiểm tra đủ 7 điều kiện voucher (docs/database-design.md 4.4) và tính số tiền giảm.
  * Dùng chung cho báo giá và chốt đơn; không ghi gì vào CSDL.
+ * Truyền `db` là transaction client để chốt đơn kiểm tra lại voucher SAU khi đã khóa.
  */
 export async function validateVoucher(options: {
   maVoucher: string
@@ -16,9 +20,11 @@ export async function validateVoucher(options: {
   tienHang: Decimal
   khachHangId?: string | null
   now?: Date
+  db?: Tx
 }) {
+  const db: Tx = options.db ?? prisma
   const code = options.maVoucher.trim().toUpperCase()
-  const voucher = await prisma.voucher.findUnique({ where: { maVoucher: code } })
+  const voucher = await db.voucher.findUnique({ where: { maVoucher: code } })
   if (!voucher) throw new AppError(400, 'Mã voucher không tồn tại', 'VOUCHER_NOT_FOUND')
 
   const now = options.now ?? new Date()
@@ -41,7 +47,7 @@ export async function validateVoucher(options: {
     throw new AppError(400, 'Đơn hàng chưa đạt giá trị tối thiểu của voucher', 'VOUCHER_MIN_ORDER')
   }
   if (voucher.gioiHanMoiKhach !== null && options.khachHangId) {
-    const used = await prisma.voucherLuotDung.count({
+    const used = await db.voucherLuotDung.count({
       where: { voucherId: voucher.id, khachHangId: options.khachHangId },
     })
     if (used >= voucher.gioiHanMoiKhach) {

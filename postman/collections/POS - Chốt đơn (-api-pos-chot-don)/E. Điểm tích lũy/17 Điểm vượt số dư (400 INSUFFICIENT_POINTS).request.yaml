@@ -1,0 +1,29 @@
+$kind: http-request
+description: "khachHangItDiem: khách có ít điểm; diemVuotSoDu = số dư + 1, nhưng vẫn NHỎ HƠN tiền còn lại của đơn để không dính POINTS_EXCEED_REMAINING."
+url: "{{baseUrl}}/api/pos/chot-don"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "chiTiet": [
+        {
+          "sanPhamId": "{{sanPhamId}}",
+          "soLuong": 2
+        }
+      ],
+      "khachHangId": "{{khachHangItDiem}}",
+      "diemSuDung": {{diemVuotSoDu}},
+      "tienKhachDua": "{{tienDuLon}}",
+      "idempotencyKey": "{{runId}}-p1"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP 400', function () { pm.response.to.have.status(400); });
+      pm.test('Có mã lỗi INSUFFICIENT_POINTS', function () { pm.expect(pm.response.text()).to.include('INSUFFICIENT_POINTS'); });
+    language: text/javascript
+order: 1000

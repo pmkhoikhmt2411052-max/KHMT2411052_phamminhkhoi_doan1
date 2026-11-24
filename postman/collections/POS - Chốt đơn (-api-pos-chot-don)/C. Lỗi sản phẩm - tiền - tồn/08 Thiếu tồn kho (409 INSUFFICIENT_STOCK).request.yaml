@@ -1,0 +1,29 @@
+$kind: http-request
+description: Rollback toàn bộ. Nếu soLuong 999999 vẫn đủ tồn, tăng số hơn.
+url: "{{baseUrl}}/api/pos/chot-don"
+method: POST
+headers:
+  Content-Type: application/json
+  Authorization: Bearer {{token}}
+body:
+  type: json
+  content: |-
+    {
+      "chiTiet": [
+        {
+          "sanPhamId": "{{sanPhamId}}",
+          "soLuong": 999999
+        }
+      ],
+      "diemSuDung": 0,
+      "tienKhachDua": "999999999999",
+      "idempotencyKey": "{{runId}}-stock"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('HTTP 409', function () { pm.response.to.have.status(409); });
+      pm.test('Có mã lỗi INSUFFICIENT_STOCK', function () { pm.expect(pm.response.text()).to.include('INSUFFICIENT_STOCK'); });
+      pm.test('Kèm maSp', function () { pm.expect(pm.response.text()).to.include('maSp'); });
+    language: text/javascript
+order: 2000
