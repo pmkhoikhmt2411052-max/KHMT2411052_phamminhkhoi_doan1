@@ -3,7 +3,12 @@ import { createHash } from 'node:crypto'
 import bcrypt from 'bcryptjs'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '../generated/prisma/client.ts'
-import type { LoaiSanPham } from '../generated/prisma/enums'
+import type {
+  ApDungKenhVoucher,
+  LoaiGiamVoucher,
+  LoaiSanPham,
+  TrangThaiVoucher,
+} from '../generated/prisma/enums'
 import { roles, seedRoles } from './roles'
 const ADMIN_USERNAME = 'admin'
 const ADMIN_MA_NV = 'NV_ADMIN'
@@ -233,6 +238,51 @@ const comboComponents = [
   { maSp: 'SP006', soLuong: 1 },
   { maSp: 'SP007', soLuong: 1 },
   { maSp: 'SP008', soLuong: 1 },
+]
+
+// 2 voucher mẫu để thử POS khi demo — mã CHỮ HOA (bắt buộc bởi CHECK mới).
+const vouchers: Array<{
+  maVoucher: string
+  tenVoucher: string
+  loaiGiam: LoaiGiamVoucher
+  giaTri: number
+  giaTriDonToiThieu: number
+  giamToiDa: number | null
+  soLuong: number
+  gioiHanMoiKhach: number | null
+  apDungKenh: ApDungKenhVoucher
+  ngayBatDau: Date
+  ngayKetThuc: Date
+  trangThai: TrangThaiVoucher
+}> = [
+  {
+    maVoucher: 'SALE10',
+    tenVoucher: 'Giảm 10% (tối đa 50.000đ)',
+    loaiGiam: 'PHAN_TRAM',
+    giaTri: 10,
+    giaTriDonToiThieu: 0,
+    giamToiDa: 50000,
+    soLuong: 100,
+    gioiHanMoiKhach: 2,
+    apDungKenh: 'TAT_CA',
+    ngayBatDau: new Date(Date.now() - 86_400_000),
+    ngayKetThuc: new Date(Date.now() + 365 * 86_400_000),
+    trangThai: 'HOAT_DONG',
+  },
+  {
+    maVoucher: 'GIAM50K',
+    tenVoucher: 'Giảm 50.000đ cho đơn từ 300.000đ (POS)',
+    loaiGiam: 'SO_TIEN',
+    giaTri: 50000,
+    giaTriDonToiThieu: 300000,
+    giamToiDa: null,
+    soLuong: 50,
+    gioiHanMoiKhach: null,
+    apDungKenh: 'POS',
+    ngayBatDau: new Date(Date.now() - 86_400_000),
+    ngayKetThuc: new Date(Date.now() + 365 * 86_400_000),
+    trangThai: 'HOAT_DONG',
+  },
 ]
 
 async function main() {
@@ -486,8 +536,30 @@ async function main() {
       },
     })
 
+    // 8. Voucher mẫu (upsert: không reset da_su_dung giữa các lần seed)
+    for (const voucher of vouchers) {
+      const fields = {
+        tenVoucher: voucher.tenVoucher,
+        loaiGiam: voucher.loaiGiam,
+        giaTri: voucher.giaTri,
+        giaTriDonToiThieu: voucher.giaTriDonToiThieu,
+        giamToiDa: voucher.giamToiDa,
+        soLuong: voucher.soLuong,
+        gioiHanMoiKhach: voucher.gioiHanMoiKhach,
+        apDungKenh: voucher.apDungKenh,
+        ngayBatDau: voucher.ngayBatDau,
+        ngayKetThuc: voucher.ngayKetThuc,
+        trangThai: voucher.trangThai,
+      }
+      await prisma.voucher.upsert({
+        where: { maVoucher: voucher.maVoucher },
+        update: fields,
+        create: { id: seedUuid(`voucher:${voucher.maVoucher}`), maVoucher: voucher.maVoucher, ...fields },
+      })
+    }
+
     console.log(
-      `Seed hoàn tất: ${roles.length} vai trò, 1 tài khoản admin, ${categories.length} danh mục, 1 nhà cung cấp, ${products.length} sản phẩm, ${comboComponents.length} thành phần combo, ${products.length} bản ghi tồn kho ban đầu.`
+      `Seed hoàn tất: ${roles.length} vai trò, 1 tài khoản admin, ${categories.length} danh mục, 1 nhà cung cấp, ${products.length} sản phẩm, ${comboComponents.length} thành phần combo, ${products.length} bản ghi tồn kho ban đầu, ${vouchers.length} voucher mẫu.`
     )
   } finally {
     await prisma.$disconnect()

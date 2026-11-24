@@ -33,25 +33,16 @@ export type TraCuuInput = z.infer<typeof traCuuSchema>
 export type BaoGiaInput = z.infer<typeof baoGiaSchema>
 
 /**
- * UC05 — chốt đơn POS. Kế thừa báo giá, thêm tiền khách đưa và khóa idempotency tùy chọn.
- * Schema `loose`: client có thể gửi kèm donGia/thanhTien/tongTien từ màn hình báo giá,
- * nhưng service CHỈ đọc sanPhamId/soLuong rồi tự tính lại mọi khoản tiền trong transaction.
- * Vì vậy giá/tiền từ client bị bỏ qua, không phải là nguồn dữ liệu.
+ * UC05 — chốt đơn POS. Kế thừa báo giá (strict), thêm tiền khách đưa và khóa idempotency.
+ * Schema strict như các API khác: mọi trường lạ (tongTien, donGia, thanhTien, ...) → 400.
+ * Mọi khoản tiền vẫn do server tính lại từ CSDL trong transaction, không tin client.
  */
-const chotDonLineSchema = z
-  .object({
-    sanPhamId: z.string().uuid(),
-    soLuong: z.number().int().positive(),
-  })
-  .loose()
-
 export const chotDonSchema = baoGiaSchema
   .extend({
-    chiTiet: z.array(chotDonLineSchema).min(1, 'Đơn phải có ít nhất một dòng'),
     tienKhachDua: moneySchema,
     idempotencyKey: z.string().trim().min(1).max(100).optional(),
   })
-  .loose()
+  .strict()
 
 export type ChotDonInput = z.infer<typeof chotDonSchema>
 

@@ -320,9 +320,10 @@ Chỉ `THU_NGAN` hoặc `ADMIN`; mọi route POS còn chặn nhân viên `DA_NGH
 }
 ```
 
-- `tienKhachDua` nhận số hoặc chuỗi thập phân tối đa 2 chữ số. Schema ở dạng **loose**:
-  client có thể gửi kèm `donGia`/`thanhTien`/`tongTien`/`diemCong` từ màn hình báo giá,
-  nhưng service **bỏ qua** toàn bộ — chỉ đọc `sanPhamId`/`soLuong` rồi tự tính lại trong transaction.
+- `tienKhachDua` nhận số hoặc chuỗi thập phân tối đa 2 chữ số.
+- Schema **strict** như các API khác: chỉ nhận các field liệt kê ở trên. Gửi `tongTien`,
+  `donGia`, `thanhTien`, `tienGiamVoucher`, ... → `400 VALIDATION_ERROR` (không được "bỏ qua").
+  Dù sao thì mọi khoản tiền vẫn do server tính lại từ CSDL trong transaction, không tin client.
 - `idempotencyKey` (tùy chọn): `ma_giao_dich = "POS-" + khóa`. Vân tay nội dung gồm
   dòng (đã gộp theo sản phẩm), voucher, `diemSuDung`, khách, nhân viên. Không gồm `tienKhachDua`.
 
@@ -360,6 +361,12 @@ Chỉ `THU_NGAN` hoặc `ADMIN`; mọi route POS còn chặn nhân viên `DA_NGH
 `VOUCHER_PER_CUSTOMER_LIMIT` / `VOUCHER_INVALID_PERCENT` (400), `IDEMPOTENCY_CONFLICT` (409),
 `CONSTRAINT_VIOLATION` / `INVALID_ORDER_AMOUNT` / `INVALID_PAYMENT_AMOUNT` / `INVALID_POINTS`
 / `INVALID_STOCK_LEDGER` / `INVALID_REFERENCE` (400/409 theo loại ràng buộc).
+
+**Ràng buộc mã voucher:** migration `20261124000000_voucher_ma_voucher_uppercase` thêm CHECK
+`Voucher_ma_voucher_upper_check` (`ma_voucher = upper(ma_voucher)`), nên mã lưu trong CSDL luôn
+chữ hoa. `validateVoucher` cũng chuẩn hóa `upper()`, vì vậy khách gửi `sale10` vẫn khớp `SALE10`.
+Seed có 2 voucher mẫu để demo: `SALE10` (giảm 10%, tối đa 50.000đ, mọi kênh) và `GIAM50K`
+(giảm 50.000đ, đơn từ 300.000đ, riêng POS).
 
 **Idempotency:** cùng khóa + cùng nội dung → `200` đơn cũ; cùng khóa + khác nội dung → `409`;
 hai yêu cầu đồng thời cùng khóa → bắt `P2002` ngay khi tạo `ThanhToan`, chỉ một đơn được tạo,

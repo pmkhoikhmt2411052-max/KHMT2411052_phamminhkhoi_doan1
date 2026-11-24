@@ -4,7 +4,7 @@ import request from 'supertest'
 import { createApp } from '../src/app'
 import { POS_CONFIG } from '../src/config/pos'
 import { prisma } from '../src/config/prisma'
-import { Decimal, formatMoney, toDecimal } from '../src/utils/money'
+import { formatMoney, toDecimal } from '../src/utils/money'
 import { assertTestDatabase, cleanDb, createStaffAccount } from './support/db'
 
 const app = createApp()
@@ -302,7 +302,7 @@ describe('POS — báo giá khớp chốt đơn (UC04/UC05)', () => {
     })
   })
 
-  it('giá/tiền từ client bị bỏ qua, mọi khoản được tính lại từ CSDL', async () => {
+  it('trường lạ từ client (tongTien, donGia, ...) → 400 VALIDATION_ERROR', async () => {
     const category = await makeCategory()
     const product = await makeProduct({ danhMucId: category.danhMucId, giaBan: 1234.56, soLuongTon: 5 })
     const headers = await headersFor()
@@ -325,12 +325,17 @@ describe('POS — báo giá khớp chốt đơn (UC04/UC05)', () => {
       diemCong: 999,
       diemSuDung: 0,
     }
-    const res = await chot(body, headers).expect(201)
-    expect(res.body.tienHang).toBe('2469.12')
-    expect(res.body.tongTien).toBe('2469.12')
-    expect(res.body.chiTiet[0]).toMatchObject({ donGia: '1234.56', thanhTien: '2469.12' })
-    expect(res.body.diemCong).toBe(Math.floor(2469 / POS_CONFIG.diemMoiTien))
-    expect(res.body.tienThua).toBe(formatMoney(toDecimal(CASH).sub(toDecimal('2469.12'))))
+    const res = await chot(body, headers).expect(400)
+    expect(res.body.error.code).toBe('VALIDATION_ERROR')
+    // Zod v4 gộp khóa lạ thành một issue ở cấp object (path '' / 'chiTiet.0'),
+    // nên kiểm tra tên field trong message thay vì path.
+    const messages = (res.body.error.issues ?? [])
+      .map((issue: { message?: string }) => issue.message ?? '')
+      .join(' ')
+    expect(messages).toContain('tongTien')
+    expect(messages).toContain('donGia')
+    expect(await donHangCount()).toBe(0)
+    expect((await prisma.sanPham.findUniqueOrThrow({ where: { id: product.id } })).soLuongTon).toBe(5)
   })
 })
 
@@ -499,6 +504,33 @@ describe('POS — dùng điểm (UC04/UC05)', () => {
     if (diemCong > 0) {
       expect(logs[1]).toMatchObject({ loai: 'CONG', soDiem: diemCong, soDuSau: 995 + diemCong })
     }
+  })
+
+  it('hai đơn dùng điểm cùng lúc (Promise.all): chỉ một đơn thành công, điểm không âm', async () => {
+    const diemSuDung = 5
+    // Chọn giá để tongTien = 1đ → diemCong = 0; sau đơn đầu tiên số dư về đúng 0.
+    const giaBan = diemSuDung * POS_CONFIG.giaTriDiem + 1
+    const pricey = await makeProduct({ danhMucId: category.danhMucId, giaBan, soLuongTon: 10 })
+    const customer = await makeCustomer({ diemTichLuy: diemSuDung })
+    const body = bodyFor([[pricey.id, 1]], { khachHangId: customer.id, diemSuDung })
+
+    const results = await Promise.all([chot(body, headers), chot(body, headers)])
+    expect(results.map((res) => res.status).sort()).toEqual([201, 400])
+    const failed = results.find((res) => res.status === 400)!
+    expect(failed.body.error.code).toBe('INSUFFICIENT_POINTS')
+
+    const finalCustomer = await prisma.khachHang.findUniqueOrThrow({ where: { id: customer.id } })
+    expect(finalCustomer.diemTichLuy).toBe(0)
+    expect(finalCustomer.diemTichLuy).toBeGreaterThanOrEqual(0)
+
+    const successId = results.find((res) => res.status === 201)!.body.id as string
+    const logs = await prisma.lichSuDiem.findMany({
+      where: { khachHangId: customer.id },
+      orderBy: { ngayTao: 'asc' },
+    })
+    expect(logs).toHaveLength(1)
+    expect(logs[0]).toMatchObject({ donHangId: successId, loai: 'TRU', soDiem: diemSuDung, soDuSau: 0 })
+    expect(await donHangCount()).toBe(1)
   })
 
   it('đơn khách lẻ: không có khách, không ghi lịch sử điểm', async () => {
@@ -677,5 +709,61 @@ describe('POS — xem hóa đơn và danh sách đơn (UC05)', () => {
     await request(app).delete(`/api/pos/don-hang/${id}`).set(headers).expect(404)
     await request(app).patch(`/api/pos/chot-don/${id}`).set(headers).send({}).expect(404)
     await request(app).delete(`/api/pos/chot-don/${id}`).set(headers).expect(404)
+  })
+})
+
+// ============================================ CHECK: mã voucher chữ hoa
+
+describe('Voucher — CHECK ma_voucher chữ hoa', () => {
+  const voucherData = (maVoucher: string) => ({
+    maVoucher,
+    tenVoucher: 'Voucher kiểm tra CHECK',
+    loaiGiam: 'SO_TIEN' as const,
+    giaTri: 100,
+    giaTriDonToiThieu: 0,
+    giamToiDa: null,
+    soLuong: 5,
+    daSuDung: 0,
+    gioiHanMoiKhach: null,
+    apDungKenh: 'TAT_CA' as const,
+    ngayBatDau: new Date(Date.now() - 86_400_000),
+    ngayKetThuc: new Date(Date.now() + 86_400_000),
+    trangThai: 'HOAT_DONG' as const,
+  })
+
+  it('migration đã tạo ràng buộc Voucher_ma_voucher_upper_check', async () => {
+    const rows = await prisma.$queryRaw<{ conname: string }[]>`
+      SELECT conname FROM pg_constraint WHERE conname = 'Voucher_ma_voucher_upper_check'
+    `
+    expect(rows).toHaveLength(1)
+  })
+
+  it('vi phạm: ma_voucher thường bị CSDL từ chối, không lưu dòng nào', async () => {
+    const maVoucher = `vc-${suffix().toLowerCase()}`
+    expect(maVoucher).not.toBe(maVoucher.toUpperCase())
+
+    let error: unknown
+    try {
+      await prisma.voucher.create({ data: voucherData(maVoucher) })
+    } catch (caught) {
+      error = caught
+    }
+    expect(error).toBeDefined()
+    expect(await prisma.voucher.count({ where: { maVoucher } })).toBe(0)
+  })
+
+  it('hợp lệ: ma_voucher chữ hoa được lưu và dùng được dù client gửi thường', async () => {
+    const headers = await headersFor()
+    const category = await makeCategory()
+    const product = await makeProduct({ danhMucId: category.danhMucId, giaBan: 1000, soLuongTon: 10 })
+    const maVoucher = `VC-${suffix().toUpperCase()}`
+    const voucher = await prisma.voucher.create({ data: voucherData(maVoucher) })
+    track(() => prisma.voucher.deleteMany({ where: { id: voucher.id } }))
+    expect(voucher.maVoucher).toBe(maVoucher)
+
+    // validateVoucher chuẩn hóa upper() nên khách gửi thường vẫn khớp mã đã lưu.
+    const res = await chot(bodyFor([[product.id, 1]], { maVoucher: maVoucher.toLowerCase() }), headers).expect(201)
+    expect(res.body.voucher).toMatchObject({ maVoucher })
+    expect(await prisma.voucherLuotDung.count({ where: { voucherId: voucher.id } })).toBe(1)
   })
 })
