@@ -3,8 +3,14 @@ import { Prisma } from '../../generated/prisma/client.ts'
 import type { KhachHang, Voucher } from '../../generated/prisma/client.ts'
 import { prisma } from '../config/prisma'
 import { POS_CONFIG } from '../config/pos'
+import type { Role } from '../constants/roles'
 import { AppError, ConflictError, ForbiddenError, NotFoundError } from '../errors/app-error'
-import type { BaoGiaInput, ChotDonInput, TraCuuInput } from '../validators/pos.validator'
+import type {
+  BaoGiaInput,
+  ChotDonInput,
+  ListDonHangInput,
+  TraCuuInput,
+} from '../validators/pos.validator'
 import { Decimal, formatDateInTimezone, formatMoney, toDecimal } from '../utils/money'
 import { normalizeVietnamese, VIETNAMESE_FROM, VIETNAMESE_TO } from '../utils/text'
 import { validateVoucher } from './voucher.service'
@@ -446,12 +452,15 @@ async function findOrderByMaGiaoDich(maGiaoDich: string) {
   })
 }
 
-/** Dựng hóa đơn từ đơn đã lưu; tiền thừa = tiền khách đưa - tong_tien. */
-async function buildInvoice(orderId: string, tienKhachDua: Decimal) {
+/**
+ * Dựng hóa đơn từ đơn đã lưu; tiền thừa = tiền khách đưa - tong_tien.
+ * Khi xem lại hóa đơn (không có request gốc), tiền khách đưa không được lưu trong CSDL
+ * nên trả null cho cả hai khoản này.
+ */
+async function buildInvoice(orderId: string, tienKhachDua: Decimal | null) {
   const order = await prisma.donHang.findUnique({ where: { id: orderId }, include: ORDER_INCLUDE })
   if (!order) throw new NotFoundError('Không tìm thấy đơn hàng')
   const tongTien = toDecimal(order.tongTien)
-  const tienThua = tienKhachDua.sub(tongTien)
   const thanhToan = order.thanhToans.find((t) => t.trangThai === 'THANH_CONG') ?? order.thanhToans[0]
   return {
     id: order.id,
@@ -489,8 +498,8 @@ async function buildInvoice(orderId: string, tienKhachDua: Decimal) {
     tongTien: formatMoney(tongTien),
     diemSuDung: order.diemSuDung,
     diemCong: order.diemCong,
-    tienKhachDua: formatMoney(tienKhachDua),
-    tienThua: formatMoney(tienThua),
+    tienKhachDua: tienKhachDua ? formatMoney(tienKhachDua) : null,
+    tienThua: tienKhachDua ? formatMoney(tienKhachDua.sub(tongTien)) : null,
     thanhToan: thanhToan
       ? {
           id: thanhToan.id,
@@ -753,4 +762,74 @@ async function chotDon(input: ChotDonInput, taiKhoanId: string) {
   throw new AppError(409, 'Không thể sinh mã đơn hàng duy nhất, vui lòng thử lại', 'MA_DH_GENERATION_FAILED')
 }
 
-export const posService = { traCuu, baoGia, chotDon }
+/** UC05 — xem lại hóa đơn để in lại; chỉ đơn POS, thu ngân thấy đơn của mình, ADMIN thấy mọi đơn. */
+async function xemHoaDon(id: string, taiKhoanId: string, vaiTro: Role) {
+  const order = await prisma.donHang.findUnique({ where: { id }, include: ORDER_INCLUDE })
+  if (!order || order.kenhBan !== 'POS') throw new NotFoundError('Không tìm thấy hóa đơn')
+  if (vaiTro !== 'ADMIN') {
+    const nhanVien = await prisma.nhanVien.findUnique({ where: { taiKhoanId }, select: { id: true } })
+    if (!nhanVien || order.nhanVienId !== nhanVien.id) {
+      throw new NotFoundError('Không tìm thấy hóa đơn')
+    }
+  }
+  // Tiền khách đưa không được lưu; xem lại hóa đơn trả null cho hai khoản này.
+  return buildInvoice(id, null)
+}
+
+/** UC05 — danh sách đơn POS; thu ngân chỉ thấy đơn mình thu, ADMIN thấy mọi đơn. */
+async function danhSachDon(input: ListDonHangInput, taiKhoanId: string, vaiTro: Role) {
+  let nhanVienId: string | undefined
+  if (vaiTro !== 'ADMIN') {
+    const nhanVien = await prisma.nhanVien.findUnique({ where: { taiKhoanId }, select: { id: true } })
+    nhanVienId = nhanVien?.id ?? ''
+  }
+  const where: Prisma.DonHangWhereInput = {
+    kenhBan: 'POS',
+    ...(nhanVienId !== undefined ? { nhanVienId } : {}),
+    ...(input.trangThai ? { trangThai: input.trangThai } : {}),
+    ...(input.maDh ? { maDh: { contains: input.maDh } } : {}),
+    ...(input.tuNgay || input.denNgay
+      ? {
+          ngayTao: {
+            ...(input.tuNgay ? { gte: input.tuNgay } : {}),
+            ...(input.denNgay ? { lte: input.denNgay } : {}),
+          },
+        }
+      : {}),
+  }
+  const [rows, total] = await Promise.all([
+    prisma.donHang.findMany({
+      where,
+      include: ORDER_INCLUDE,
+      orderBy: { ngayTao: 'desc' },
+      skip: (input.page - 1) * input.pageSize,
+      take: input.pageSize,
+    }),
+    prisma.donHang.count({ where }),
+  ])
+  return {
+    data: rows.map((order) => ({
+      id: order.id,
+      maDh: order.maDh,
+      trangThai: order.trangThai,
+      tongTien: formatMoney(toDecimal(order.tongTien)),
+      diemSuDung: order.diemSuDung,
+      diemCong: order.diemCong,
+      khachHang: order.khachHang
+        ? { id: order.khachHang.id, hoTen: order.khachHang.hoTen, sdt: order.khachHang.sdt }
+        : null,
+      nhanVien: order.nhanVien,
+      soDong: order.chiTietDonHangs.length,
+      ngayTao: order.ngayTao,
+      ngayThanhToan: order.ngayThanhToan,
+    })),
+    pagination: {
+      page: input.page,
+      pageSize: input.pageSize,
+      total,
+      totalPages: Math.ceil(total / input.pageSize),
+    },
+  }
+}
+
+export const posService = { traCuu, baoGia, chotDon, xemHoaDon, danhSachDon }

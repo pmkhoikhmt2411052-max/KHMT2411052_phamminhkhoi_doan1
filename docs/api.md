@@ -1,8 +1,8 @@
 # Thiết kế API — BookMark
 
-> Trạng thái: đang cài đặt (đã xong khung app, xác thực, phân quyền, API công khai UC11
-> và API quản trị UC15 cho danh mục/sản phẩm; đã cài đặt nhập kho UC06/UC07
-> và đã cài đặt kiểm kê UC08/UC09; đang cài đặt POS UC02/UC04/UC05).
+> Trạng thái: đã xong khung app, xác thực, phân quyền, API công khai UC11 và API quản trị
+> UC15 cho danh mục/sản phẩm; đã cài đặt nhập kho UC06/UC07, kiểm kê UC08/UC09 và toàn bộ
+> POS UC02/UC04/UC05 (tra cứu, báo giá, chốt đơn, hóa đơn, danh sách đơn).
 > Nguồn: `docs/spec.md` mục 1.3.2, 2.8.3, 3.1.1, 3.10 và `docs/database-design.md` phần 1.
 
 ## 1. Quy ước chung
@@ -91,6 +91,9 @@ Trích từ bảng phân công use case (spec 1.3.2) và RBAC (spec 2.8.3).
 | POST | `/api/kiem-ke/:id/tu-choi` | `ADMIN` | ✓ xong (UC09) |
 | GET | `/api/pos/san-pham` | `THU_NGAN`, `ADMIN` | ✓ xong (UC02) |
 | POST | `/api/pos/bao-gia` | `THU_NGAN`, `ADMIN` | ✓ xong (UC04) |
+| POST | `/api/pos/chot-don` | `THU_NGAN`, `ADMIN` | ✓ xong (UC05) |
+| GET | `/api/pos/don-hang` | `THU_NGAN`, `ADMIN` | ✓ xong (UC05) |
+| GET | `/api/pos/don-hang/:id` | `THU_NGAN`, `ADMIN` | ✓ xong (UC05) |
 
 > Mọi route `/api/admin/*` đều có `authenticate` + `requireRole('ADMIN')`:
 > không token → `401`, sai vai trò → `403`.
@@ -299,6 +302,83 @@ Chỉ `THU_NGAN` hoặc `ADMIN`. **Không ghi gì vào CSDL.**
   - `diemToiDa = min(diemTichLuy, floor((tienHang - giamVoucher) / giaTriDiem))`.
   - `diemCong = floor(tongTien / diemMoiTien)` (0 nếu không khách hoặc khách bị khóa).
 
+### 3.10. Chốt đơn, hóa đơn và danh sách đơn POS (UC05)
+
+Chỉ `THU_NGAN` hoặc `ADMIN`; mọi route POS còn chặn nhân viên `DA_NGHI` (`403`).
+
+#### `POST /api/pos/chot-don`
+
+```json
+{
+  "chiTiet": [{ "sanPhamId": "uuid", "soLuong": 2 }],
+  "maVoucher": "string?",
+  "diemSuDung": 0,
+  "khachHangId": "uuid?",
+  "sdt": "string?",
+  "tienKhachDua": "200000",
+  "idempotencyKey": "pos-ca1-0001"
+}
+```
+
+- `tienKhachDua` nhận số hoặc chuỗi thập phân tối đa 2 chữ số. Schema ở dạng **loose**:
+  client có thể gửi kèm `donGia`/`thanhTien`/`tongTien`/`diemCong` từ màn hình báo giá,
+  nhưng service **bỏ qua** toàn bộ — chỉ đọc `sanPhamId`/`soLuong` rồi tự tính lại trong transaction.
+- `idempotencyKey` (tùy chọn): `ma_giao_dich = "POS-" + khóa`. Vân tay nội dung gồm
+  dòng (đã gộp theo sản phẩm), voucher, `diemSuDung`, khách, nhân viên. Không gồm `tienKhachDua`.
+
+**Phản hồi:** `201` (đơn mới) hoặc `200` (trả đơn cũ). Các khoản tiền đều là chuỗi 2 chữ số:
+`maDh`, `id`, `kenhBan`, `trangThai`, `chiTiet[]` (`maSp`, `tenSp`, `soLuong`, `donGia`, `thanhTien`),
+`khachHang`, `nhanVien`, `voucher`, `tienHang`, `tienGiamVoucher`, `tienGiamDiem`, `phiVanChuyen`,
+`tongTien`, `diemSuDung`, `diemCong`, `tienKhachDua`, `tienThua`, `thanhToan`, `ngayTao`,
+`ngayThanhToan`. `tienThua = tienKhachDua - tongTien`.
+
+**Transaction ACID — thứ tự khóa và ghi:**
+
+1. Khóa `SanPham` theo `id ASC` (`FOR UPDATE OF sp`), kiểm tra còn `DANG_BAN` và danh mục
+   `HOAT_DONG`. Khóa `Voucher` (nếu có), rồi khóa `KhachHang` (nếu có).
+2. Gọi lại **cùng hàm `computeQuote`** dùng cho báo giá để tính giá/voucher/điểm sau khi khóa.
+3. `tienKhachDua < tongTien` → `400 INSUFFICIENT_CASH`, không ghi gì. `tongTien = 0` → `400 INVALID_TOTAL`
+   (do `ThanhToan.so_tien > 0`).
+4. Trừ tồn `UPDATE ... WHERE so_luong_ton >= soLuong`; `affected = 0` → `409 INSUFFICIENT_STOCK`
+   (nêu rõ `maSp`), rollback toàn bộ kể cả voucher/điểm/sổ kho.
+5. Ghi `DonHang` (`kenh_ban = POS`, `trang_thai = DA_THANH_TOAN`, `phi_van_chuyen = 0`,
+   `nhan_vien_id` từ token, đủ cột tiền/điểm, `ngay_thanh_toan`), `ChiTietDonHang`,
+   `ThanhToan` (`TIEN_MAT`/`THANH_CONG`, `so_tien = tong_tien`, `ma_giao_dich`),
+   `LichSuTonKho` (`BAN_HANG`, `so_luong_thay_doi` âm, trước/sau đúng công thức).
+6. Voucher: `da_su_dung` tăng bằng `UPDATE` có điều kiện còn lượt + `VoucherLuotDung`
+   (`so_tien_giam = tien_giam_voucher`); giới hạn mỗi khách kiểm lại trong transaction.
+7. Điểm: `KhachHang.diem_tich_luy` không âm, ghi `LichSuDiem` `TRU`/`CONG` với `so_du_sau`
+   đúng và `don_hang_id`. Khách lẻ bỏ qua; khách `BI_KHOA` không dùng/không cộng.
+8. `ma_dh = DH-yyyyMMdd-XXXXXX` theo `Asia/Ho_Chi_Minh`; trùng thì thử lại tối đa 5 lần.
+   Lỗi ràng buộc CSDL (CHECK/unique/FK/trigger) được dịch sang lỗi API, không lộ nội dung CSDL.
+
+**Mã lỗi chính:** `INSUFFICIENT_CASH` (400), `INVALID_TOTAL` (400), `INSUFFICIENT_STOCK` (409),
+`PRODUCT_NOT_SELLABLE` (400), `CATEGORY_HIDDEN` (400), `POINTS_REQUIRE_CUSTOMER` (400),
+`INSUFFICIENT_POINTS` (400), `POINTS_EXCEED_REMAINING` (400), `CUSTOMER_LOCKED` (400),
+`VOUCHER_NOT_FOUND` / `VOUCHER_INACTIVE` / `VOUCHER_NOT_STARTED` / `VOUCHER_EXPIRED` /
+`VOUCHER_OUT_OF_STOCK` / `VOUCHER_WRONG_CHANNEL` / `VOUCHER_MIN_ORDER` /
+`VOUCHER_PER_CUSTOMER_LIMIT` / `VOUCHER_INVALID_PERCENT` (400), `IDEMPOTENCY_CONFLICT` (409),
+`CONSTRAINT_VIOLATION` / `INVALID_ORDER_AMOUNT` / `INVALID_PAYMENT_AMOUNT` / `INVALID_POINTS`
+/ `INVALID_STOCK_LEDGER` / `INVALID_REFERENCE` (400/409 theo loại ràng buộc).
+
+**Idempotency:** cùng khóa + cùng nội dung → `200` đơn cũ; cùng khóa + khác nội dung → `409`;
+hai yêu cầu đồng thời cùng khóa → bắt `P2002` ngay khi tạo `ThanhToan`, chỉ một đơn được tạo,
+yêu cầu thua trả `200` với đơn đã lưu. Khi replay, `tienKhachDua` lấy theo request hiện tại và
+`tienThua` tính lại trên `tongTien` đã lưu (vẫn áp `tienKhachDua >= tongTien`).
+
+#### `GET /api/pos/don-hang/:id` — xem / in lại hóa đơn
+
+`200` hóa đơn đã lưu (cùng cấu trúc phản hồi chốt đơn). Thu ngân chỉ xem được đơn mình thu;
+`ADMIN` xem được mọi đơn. Đơn không tồn tại hoặc không phải đơn POS → `404`. Vì `tienKhachDua`
+không được lưu trong CSDL, `tienKhachDua` và `tienThua` trả `null` khi xem lại.
+
+#### `GET /api/pos/don-hang?page=&pageSize=&trangThai=&maDh=&tuNgay=&denNgay=` — danh sách đơn POS
+
+`200 { data: [...], pagination: { page, pageSize, total, totalPages } }`. Mỗi dòng gồm
+`id`, `maDh`, `trangThai`, `tongTien`, `diemSuDung`, `diemCong`, `khachHang`, `nhanVien`,
+`soDong`, `ngayTao`, `ngayThanhToan`. Thu ngân chỉ thấy đơn mình thu; `ADMIN` thấy mọi đơn.
+`pageSize` tối đa 60. Không có endpoint sửa/xóa đơn (`PATCH`/`DELETE` → `404`).
+
 ## 4. Endpoint theo thiết kế 3.10 — chưa cài đặt
 
 | Module | Endpoint | Quyền theo ma trận |
@@ -307,7 +387,8 @@ Chỉ `THU_NGAN` hoặc `ADMIN`. **Không ghi gì vào CSDL.**
 | Auth | `GET /api/v1/users` | `ADMIN` (UC16) |
 | Product | ~~`GET /api/v1/products`, `GET /api/v1/products/:id`~~ | Đã cài tại `/api/san-pham` (UC11) |
 | Product | ~~`POST /api/v1/products`, `PUT /api/v1/products/:id`~~ | Đã cài tại `/api/admin/san-pham` (UC15) |
-| Sales | `POST /api/v1/orders/pos` | `THU_NGAN` (UC05) |
+| Sales | ~~`POST /api/v1/orders/pos`~~ | Đã cài tại `/api/pos/chot-don` (UC05) |
+| Sales | ~~`GET /api/v1/orders/:id`~~ | Đã cài tại `/api/pos/don-hang/:id` (xem/in lại hóa đơn) |
 | Sales | `POST /api/v1/orders/online` | `KHACH_HANG` (UC12/14) |
 | Sales | `POST /api/v1/payment/vnpay` | `KHACH_HANG` (UC14) |
 | Sales | `POST /api/v1/payment/callback` | Public (server-to-server) |
