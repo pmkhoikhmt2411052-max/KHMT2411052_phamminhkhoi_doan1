@@ -2,18 +2,66 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens dùng chung cho Tailwind, Ant Design (xem main.tsx) và CSS thuần. */
+:root {
+  /* Quan trọng: chặn Auto Dark Mode của trình duyệt (nền đen + tiêu đề tím). */
+  color-scheme: light;
+  --color-primary: #183bff;
+  --color-primary-hover: #345bff;
+  --color-primary-active: #0f2edb;
+  --color-bg: #ffffff;
+  --color-surface: #eaf0ff;
+  --color-text: #171923;
+  --color-text-secondary: #697386;
+  --color-border: #e5e7eb;
+}
+
 html,
 body,
-#root {
+#root,
+.ant-app {
   min-height: 100%;
+  color-scheme: light;
+  background-color: #ffffff;
 }
 
 body {
   margin: 0;
-  background: #f8fafc;
+  background-color: #ffffff;
+  color: #171923;
 }
 
-/* react-to-print chỉ gi lại khuôn hóa đơn trong bản in. */
+/* Nền sáng rõ ràng cho các vùng nội dung kế thừa (chống invert bởi browser). */
+.ant-layout,
+.ant-layout-content,
+.ant-layout-footer {
+  background-color: #ffffff !important;
+}
+
+.ant-card {
+  background-color: #ffffff;
+  color: #171923;
+}
+
+.ant-table-thead > tr > th {
+  background-color: #eaf0ff !important;
+  color: #171923 !important;
+}
+
+/* Bo góc và viền đồng nhất cho card / khung nội dung. */
+.surface-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+/* Đảm bảo focus có thể thấy được (hover/active/disabled đồng bộ). */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* react-to-print chỉ giữ lại khuôn hóa đơn trong bản in. */
 @media print {
   .no-print {
     display: none !important;
@@ -23,5 +71,11 @@ body {
     margin: 0 !important;
     padding: 0 !important;
     max-width: none !important;
+  }
+
+  /* Giữ nguyên màu logo chính thức khi in hóa đơn. */
+  .print-area img {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }

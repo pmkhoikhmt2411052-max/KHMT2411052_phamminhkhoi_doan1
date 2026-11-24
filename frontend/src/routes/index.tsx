@@ -9,6 +9,9 @@ import { LoginPage } from '../pages/LoginPage'
 import { OrdersPage } from '../pages/OrdersPage'
 import { PosPage } from '../pages/PosPage'
 import { RegisterPage } from '../pages/RegisterPage'
+import { SanPhamChiTietPage } from '../pages/SanPhamChiTietPage'
+import { SanPhamListPage } from '../pages/SanPhamListPage'
+import { PublicLayout } from '../layouts/PublicLayout'
 import { ROLE_HOME, ROLES } from '../services/auth.service'
 import { useAuth } from './AuthContext'
 import { POS_ROLES, RequireAuth } from './RequireAuth'
@@ -33,6 +36,12 @@ export function AppRoutes() {
       <Route path="/dang-ky" element={<RegisterPage />} />
       <Route path="/login" element={<Navigate to="/dang-nhap" replace />} />
       <Route path="/khong-co-quyen" element={<ForbiddenPage />} />
+
+      {/* UC11 — duyệt sản phẩm công khai, không cần token. */}
+      <Route element={<PublicLayout />}>
+        <Route path="/san-pham" element={<SanPhamListPage />} />
+        <Route path="/san-pham/:id" element={<SanPhamChiTietPage />} />
+      </Route>
 
       <Route element={<RequireAuth allow={[ROLES.KHACH_HANG]}><AppLayout /></RequireAuth>}>
         <Route path="/" element={<HomePage />} />

@@ -17,7 +17,7 @@ export function RequireAuth({ allow, children }: RequireAuthProps) {
 
   if (status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center gap-3 text-slate-500">
+      <div className="flex min-h-screen items-center justify-center gap-3 text-muted">
         <Spin size="large" />
         <span>Đang xác thực…</span>
       </div>

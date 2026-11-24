@@ -7,6 +7,7 @@ import {
   InputNumber,
   Modal,
   Spin,
+  Statistic,
   Table,
   Tag,
   Typography,
@@ -14,6 +15,7 @@ import {
 } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link as RouterLink } from 'react-router-dom'
+import { Icon } from '../components/Icon'
 import { InvoicePanel } from '../components/InvoicePanel'
 import { ApiError } from '../services/api'
 import {
@@ -251,13 +253,46 @@ export function PosPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <Title level={3} className="!mb-0">Bán hàng tại quầy</Title>
-          <Text type="secondary">Tra cứu sản phẩm · báo giá · thanh toán · in hóa đơn</Text>
+        <div className="flex items-center gap-2">
+          <span className="grid h-9 w-9 place-items-center rounded-lg bg-surface text-primary">
+            <Icon name="cart" size={20} />
+          </span>
+          <div>
+            <Title level={3} className="!mb-0 !text-primary">Bán hàng</Title>
+            <Text type="secondary">Tra cứu sản phẩm · báo giá · thanh toán · in hóa đơn</Text>
+          </div>
         </div>
-        <RouterLink to="/pos/don-hang" className="text-sm text-brand-600 hover:underline">
+        <RouterLink to="/pos/don-hang" className="text-sm font-medium text-primary hover:text-primary-hover hover:underline">
           Xem danh sách hóa đơn →
         </RouterLink>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Card size="small" className="!border-line">
+          <Statistic
+            title="Sản phẩm tra cứu"
+            value={productTotal}
+            prefix={<Icon name="book" className="mr-2 !text-primary" size={18} />}
+          />
+        </Card>
+        <Card size="small" className="!border-line">
+          <Statistic
+            title="Dòng trong giỏ"
+            value={cart.length}
+            prefix={<Icon name="cart" className="mr-2 !text-primary" size={18} />}
+          />
+        </Card>
+        <Card size="small" className="!border-line">
+          <div className="flex items-center gap-2">
+            <Icon name="receipt" className="!text-primary" size={18} />
+            <div>
+              <div className="text-xs text-muted">Tổng báo giá</div>
+              <div className="text-xl font-bold text-primary">
+                {quote ? formatMoney(quote.tongTien) : '—'}
+              </div>
+            </div>
+          </div>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
@@ -301,7 +336,7 @@ export function PosPage() {
               size: 'small',
               onChange: (page) => void loadProducts(page),
             }}
-            scroll={{ y: 360 }}
+            scroll={{ x: 560, y: 360 }}
           />
         </Card>
 
@@ -314,7 +349,7 @@ export function PosPage() {
               columns={cartColumns}
               pagination={false}
               locale={{ emptyText: 'Chưa có sản phẩm. Chọn "Thêm" từ danh sách bên trái.' }}
-              scroll={{ y: 200 }}
+              scroll={{ x: 360, y: 200 }}
               summary={() => (
                 <Table.Summary.Row>
                   <Table.Summary.Cell index={0} colSpan={4}>
@@ -356,7 +391,7 @@ export function PosPage() {
               <Text type="secondary" className="text-xs">Tối đa {quote?.diemToiDa ?? 0}</Text>
             </div>
 
-            <div className="my-3 rounded-lg bg-slate-50 p-3 text-sm">
+            <div className="my-3 rounded-lg border border-line bg-surface p-3 text-sm">
               {quoting ? (
                 <span className="inline-flex items-center gap-2">
                   <Spin size="small" /> <Text type="secondary">Đang báo giá…</Text>
@@ -366,10 +401,10 @@ export function PosPage() {
                   <div className="flex justify-between"><span>Tiền hàng</span><span>{formatMoney(quote.tienHang)}</span></div>
                   <div className="flex justify-between"><span>Giảm voucher</span><span>-{formatMoney(quote.tienGiamVoucher)}</span></div>
                   <div className="flex justify-between"><span>Giảm điểm</span><span>-{formatMoney(quote.tienGiamDiem)}</span></div>
-                  <div className="flex justify-between border-t border-slate-300 pt-1 text-base font-bold">
+                  <div className="flex justify-between border-t border-line pt-1 text-base font-bold text-primary">
                     <span>Tổng (server tính)</span><span>{formatMoney(quote.tongTien)}</span>
                   </div>
-                  <div className="flex justify-between text-xs text-slate-500">
+                  <div className="flex justify-between text-xs text-muted">
                     <span>Khách: {quote.khachHang?.hoTen ?? 'Khách lẻ'}</span>
                     <span>Điểm cộng: {quote.diemCong}</span>
                   </div>

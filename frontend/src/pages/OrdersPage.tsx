@@ -1,5 +1,6 @@
 import { App, Button, Card, Input, Modal, Table, Tag, Typography, type TableProps } from 'antd'
 import { useEffect, useState } from 'react'
+import { Icon } from '../components/Icon'
 import { InvoicePanel } from '../components/InvoicePanel'
 import { ApiError } from '../services/api'
 import {
@@ -76,7 +77,9 @@ export function OrdersPage() {
       dataIndex: 'trangThai',
       key: 'trangThai',
       width: 140,
-      render: (value: string) => <Tag color="green">{value}</Tag>,
+      render: (value: string) => (
+        <Tag style={{ background: '#EAF0FF', color: '#183BFF', borderColor: '#D9E4FF' }}>{value}</Tag>
+      ),
     },
     {
       title: '',
@@ -93,7 +96,7 @@ export function OrdersPage() {
   return (
     <div className="space-y-4">
       <div>
-        <Title level={3} className="!mb-0">Danh sách hóa đơn POS</Title>
+        <Title level={3} className="!mb-0 !text-primary">Danh sách hóa đơn POS</Title>
         <Text type="secondary">Xem lại và in hóa đơn đã thanh toán</Text>
       </div>
 
@@ -102,6 +105,7 @@ export function OrdersPage() {
           allowClear
           className="mb-3 max-w-sm"
           placeholder="Tìm theo mã đơn (DH-...)"
+          prefix={<Icon name="search" className="text-muted" />}
           value={keyword}
           onChange={(event) => setKeyword(event.target.value)}
           onSearch={(value) => {

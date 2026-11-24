@@ -21,6 +21,8 @@ Backend phải chạy tại `http://localhost:3000`. `vite.config.ts` cấu hìn
 | `/dang-nhap` | Đăng nhập | công khai | `POST /api/auth/dang-nhap`, sau đó `GET /api/auth/toi` để lấy vai trò và điều hướng |
 | `/dang-ky` | Đăng ký khách hàng | công khai | `POST /api/auth/dang-ky`, sau đó `GET /api/auth/toi` |
 | `/` | Trang chủ khách hàng + nút đăng xuất | `KHACH_HANG` | `GET /api/auth/toi` |
+| `/san-pham` | UC11 — danh sách sản phẩm: tìm kiếm, lọc danh mục/loại, sắp xếp, phân trang | công khai | `GET /api/danh-muc`, `GET /api/san-pham` |
+| `/san-pham/:id` | UC11 — chi tiết sản phẩm, ảnh bìa, giá, tồn kho (Còn hàng/Hết hàng), thành phần combo | công khai | `GET /api/san-pham/:id` |
 | `/pos` | Bán hàng: tra cứu SP, giỏ hàng, báo giá, chốt đơn, in hóa đơn | `THU_NGAN`, `ADMIN` | `GET /api/pos/san-pham`, `POST /api/pos/bao-gia`, `POST /api/pos/chot-don` |
 | `/pos/don-hang` | Danh sách & xem lại hóa đơn (có in) | `THU_NGAN`, `ADMIN` | `GET /api/pos/don-hang`, `GET /api/pos/don-hang/:id` |
 | `/kho` | Trang kho (khung, chưa nghiệp vụ) | `NHAN_VIEN_KHO`, `ADMIN` | — |
@@ -28,6 +30,12 @@ Backend phải chạy tại `http://localhost:3000`. `vite.config.ts` cấu hìn
 | `/khong-co-quyen` | Thông báo 403 | mọi vai trò | — |
 
 Sau đăng nhập/đăng ký, điều hướng theo vai trò do `GET /api/auth/toi` trả về: `KHACH_HANG` → `/`, `THU_NGAN` → `/pos`, `NHAN_VIEN_KHO` → `/kho`, `ADMIN` → `/quan-tri`.
+
+## UC11 — phạm vi triển khai
+
+- Trang sản phẩm dùng đúng 3 endpoint công khai `GET /api/danh-muc`, `GET /api/san-pham`, `GET /api/san-pham/:id` qua proxy `/api`. Chỉ gửi các query param có trong `docs/api.md` (`page`, `pageSize`, `q`, `danhMucId`, `loaiSp`, `sort`, `order`) — backend dùng schema strict nên tham số lạ trả `400`.
+- API công khai **không trả số lượng tồn cụ thể**, chỉ trả `conHang`; giao diện vì vậy hiển thị "Còn hàng / Hết hàng", không hiển thị số lượng.
+- Spec có nhắc lọc theo **khoảng giá và nhà xuất bản**, nhưng `docs/api.md` không định nghĩa query param nào cho hai bộ lọc này (và backend từ chối tham số lạ). Vì vậy frontend **không triển khai** hai bộ lọc đó; không tự suy đoán API.
 
 ## Token & bảo mật
 

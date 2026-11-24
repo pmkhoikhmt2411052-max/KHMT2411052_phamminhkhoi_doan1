@@ -16,10 +16,38 @@ createRoot(rootElement).render(
       locale={viVN}
       theme={{
         token: {
-          colorPrimary: '#ea580c',
+          colorPrimary: '#183BFF',
+          colorPrimaryHover: '#345BFF',
+          colorPrimaryActive: '#0F2EDB',
+          colorBgBase: '#FFFFFF',
+          colorBgLayout: '#FFFFFF',
+          colorBgContainer: '#FFFFFF',
+          colorBgElevated: '#FFFFFF',
+          colorText: '#171923',
+          colorTextSecondary: '#697386',
+          colorTextTertiary: '#697386',
+          colorBorder: '#E5E7EB',
+          colorBorderSecondary: '#E5E7EB',
           borderRadius: 8,
+          borderRadiusLG: 12,
           fontFamily:
             'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+        },
+        components: {
+          Button: {
+            primaryShadow: 'none',
+            defaultShadow: 'none',
+            dangerShadow: 'none',
+            fontWeight: 600,
+          },
+          Layout: {
+            headerBg: '#183BFF',
+            headerColor: '#FFFFFF',
+            bodyBg: '#FFFFFF',
+            footerBg: '#FFFFFF',
+          },
+          Table: { borderColor: '#E5E7EB', headerBg: '#EAF0FF', headerColor: '#171923' },
+          Tabs: { itemSelectedColor: '#183BFF', inkBarColor: '#183BFF' },
         },
       }}
     >

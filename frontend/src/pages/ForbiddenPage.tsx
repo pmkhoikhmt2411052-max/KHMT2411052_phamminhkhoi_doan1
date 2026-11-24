@@ -10,7 +10,7 @@ export function ForbiddenPage() {
   const roleText = role ? ROLE_LABELS[role as Role] : 'chưa đăng nhập'
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-white px-4">
       <Result
         status="403"
         title="Không có quyền truy cập"
