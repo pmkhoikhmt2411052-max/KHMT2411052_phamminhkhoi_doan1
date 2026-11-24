@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #f8fafc;
+}
+
+/* react-to-print chỉ gi lại khuôn hóa đơn trong bản in. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-area {
+    margin: 0 !important;
+    padding: 0 !important;
+    max-width: none !important;
+  }
+}
