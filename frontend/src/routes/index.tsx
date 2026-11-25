@@ -43,7 +43,16 @@ export function AppRoutes() {
         <Route path="/san-pham/:id" element={<SanPhamChiTietPage />} />
       </Route>
 
-      <Route element={<RequireAuth allow={[ROLES.KHACH_HANG]}><AppLayout /></RequireAuth>}>
+      {/* Trang chủ là trang công khai theo UC11 — mở cho mọi vai trò đã đăng nhập. */}
+      <Route
+        element={
+          <RequireAuth
+            allow={[ROLES.KHACH_HANG, ROLES.THU_NGAN, ROLES.NHAN_VIEN_KHO, ROLES.ADMIN]}
+          >
+            <AppLayout />
+          </RequireAuth>
+        }
+      >
         <Route path="/" element={<HomePage />} />
       </Route>
       <Route element={<RequireAuth allow={POS_ROLES}><AppLayout /></RequireAuth>}>

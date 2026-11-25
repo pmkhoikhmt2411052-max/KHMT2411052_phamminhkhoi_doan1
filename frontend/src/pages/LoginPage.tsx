@@ -40,7 +40,9 @@ export function LoginPage() {
       <div className="mx-auto grid min-h-screen max-w-5xl items-center gap-8 px-4 py-10 lg:grid-cols-2">
         <div className="relative hidden min-h-96 items-center justify-center overflow-hidden rounded-2xl bg-surface lg:flex">
           <AuthWave />
-          <Logo className="relative z-10 h-40" />
+          <div className="relative z-10 rounded-2xl bg-white px-8 py-6 shadow-sm">
+            <Logo className="h-40" />
+          </div>
         </div>
 
         <Card className="border-line shadow-sm" styles={{ body: { padding: 32 } }}>
@@ -58,11 +60,15 @@ export function LoginPage() {
             initialValues={{ dinhDanh: '', matKhau: '' }}
             onFinish={(values) => void onFinish(values)}
           >
-            <Form.Item name="dinhDanh" label="Định danh" rules={[requiredRule('định danh')]}>
+            <Form.Item
+              name="dinhDanh"
+              label="Tên đăng nhập, email hoặc số điện thoại"
+              rules={[requiredRule('tên đăng nhập, email hoặc số điện thoại')]}
+            >
               <Input
                 size="large"
                 autoComplete="username"
-                placeholder="Tên đăng nhập hoặc email"
+                placeholder="Tên đăng nhập, email hoặc số điện thoại"
                 prefix={<Icon name="user" className="text-muted" />}
               />
             </Form.Item>
@@ -80,10 +86,6 @@ export function LoginPage() {
           </Form>
 
           <div className="mt-4 text-center text-sm text-muted">
-            <span className="cursor-not-allowed text-muted" title="Tính năng đặt lại mật khẩu chưa có API">
-              Quên mật khẩu?
-            </span>
-            <span className="mx-2 text-line">|</span>
             <Link to="/dang-ky" className="font-medium text-primary hover:text-primary-hover">
               Đăng ký tài khoản
             </Link>

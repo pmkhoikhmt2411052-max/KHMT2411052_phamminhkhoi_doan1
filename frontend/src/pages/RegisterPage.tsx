@@ -1,4 +1,5 @@
-import { App, Button, Card, Form, Input, Typography } from 'antd'
+import { Alert, App, Button, Card, Form, Input, Typography } from 'antd'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthWave } from '../components/AuthWave'
 import { Icon } from '../components/Icon'
@@ -10,13 +11,34 @@ import { emailRule, minLengthRule, phoneRule, requiredRule } from '../utils/form
 
 const { Title, Text } = Typography
 
+/** Dịch lỗi 400/409 của API sang thông báo tiếng Việt rõ ràng. */
+function registerErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) return 'Đăng ký thất bại. Vui lòng thử lại.'
+  if (error.status === 409) {
+    const text = error.message
+    if (text.includes('Tên đăng nhập')) return 'Tên đăng nhập đã tồn tại. Vui lòng chọn tên khác.'
+    if (text.includes('Email')) return 'Email đã tồn tại. Vui lòng dùng email khác.'
+    if (text.includes('Số điện thoại') || text.includes('điện thoại')) {
+      return 'Số điện thoại đã tồn tại. Vui lòng dùng số khác.'
+    }
+    return 'Thông tin đăng ký đã tồn tại. Vui lòng kiểm tra lại.'
+  }
+  if (error.status === 400) {
+    const details = error.issues.map((issue) => issue.message).filter(Boolean).join('; ')
+    return details ? `Dữ liệu chưa hợp lệ: ${details}` : 'Dữ liệu đầu vào không hợp lệ. Vui lòng kiểm tra lại.'
+  }
+  return error.message || 'Đăng ký thất bại. Vui lòng thử lại.'
+}
+
 export function RegisterPage() {
   const { message } = App.useApp()
   const navigate = useNavigate()
   const { signUp } = useAuth()
   const [form] = Form.useForm<RegisterInput>()
+  const [formError, setFormError] = useState('')
 
   const onFinish = async (values: RegisterInput) => {
+    setFormError('')
     try {
       const payload: RegisterInput = {
         username: values.username.trim().toLowerCase(),
@@ -30,7 +52,7 @@ export function RegisterPage() {
       message.success('Đăng ký thành công')
       navigate(ROLE_HOME[me.taiKhoan.vaiTro], { replace: true })
     } catch (error) {
-      message.error(error instanceof ApiError ? error.message : 'Đăng ký thất bại. Vui lòng thử lại.')
+      setFormError(registerErrorMessage(error))
     }
   }
 
@@ -39,7 +61,9 @@ export function RegisterPage() {
       <div className="mx-auto grid min-h-screen max-w-5xl items-center gap-8 px-4 py-10 lg:grid-cols-2">
         <div className="relative hidden min-h-96 items-center justify-center overflow-hidden rounded-2xl bg-surface lg:flex">
           <AuthWave />
-          <Logo className="relative z-10 h-40" />
+          <div className="relative z-10 rounded-2xl bg-white px-8 py-6 shadow-sm">
+            <Logo className="h-40" />
+          </div>
         </div>
 
         <Card className="border-line shadow-sm" styles={{ body: { padding: 32 } }}>
@@ -47,9 +71,23 @@ export function RegisterPage() {
           <Title level={2} className="!mb-1 !text-center !text-primary">
             Đăng ký tài khoản
           </Title>
-          <Text type="secondary" className="!mb-6 block !text-center">
+          <Text type="secondary" className="!mb-1 block !text-center">
             Tạo tài khoản để trải nghiệm tốt hơn
           </Text>
+          <Text type="secondary" className="!mb-5 block !text-center !text-xs">
+            Nhập ít nhất email hoặc số điện thoại
+          </Text>
+
+          {formError && (
+            <Alert
+              type="error"
+              showIcon
+              closable
+              message={formError}
+              className="!mb-4"
+              onClose={() => setFormError('')}
+            />
+          )}
 
           <Form<RegisterInput>
             form={form}

@@ -17,7 +17,12 @@ interface NavItem {
 }
 
 const HEADER_ITEMS: NavItem[] = [
-  { to: '/', label: 'Trang chủ', icon: 'home', roles: [ROLES.KHACH_HANG] },
+  {
+    to: '/',
+    label: 'Trang chủ',
+    icon: 'home',
+    roles: [ROLES.KHACH_HANG, ROLES.THU_NGAN, ROLES.NHAN_VIEN_KHO, ROLES.ADMIN],
+  },
   { to: '/san-pham', label: 'Sản phẩm', icon: 'book', roles: [ROLES.KHACH_HANG, ROLES.ADMIN] },
   { to: '/pos', label: 'Bán hàng', icon: 'cart', roles: [ROLES.THU_NGAN] },
   { to: '/pos/don-hang', label: 'Đơn hàng', icon: 'receipt', roles: [ROLES.THU_NGAN, ROLES.ADMIN] },
