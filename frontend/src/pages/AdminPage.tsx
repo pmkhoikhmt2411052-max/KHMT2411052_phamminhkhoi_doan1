@@ -13,6 +13,11 @@ interface CategoryStat {
   total: number
 }
 
+/** API /danh-muc trả cây: đếm cả danh mục cha và con đang hoạt động. */
+function countCategories(nodes: DanhMucNode[]): number {
+  return nodes.reduce((total, node) => total + 1 + countCategories(node.con), 0)
+}
+
 /** Trang quản trị: dùng số liệu thật từ các API đã có (không gọi API báo cáo mới). */
 export function AdminPage() {
   const [categories, setCategories] = useState<DanhMucNode[]>([])
@@ -86,7 +91,7 @@ export function AdminPage() {
           </div>
         </div>
         <Paragraph type="secondary" className="!mb-0">
-          Khu vực quản trị (danh mục, tài khoản, báo cáo) sẽ được bổ sung nghiệp vụ ở bước sau.
+          Tổng quan số liệu sản phẩm, danh mục và đơn hàng POS trong hệ thống BookMark.
         </Paragraph>
       </Card>
 
@@ -105,7 +110,7 @@ export function AdminPage() {
           <Card className="!border-line">
             <Statistic
               title="Tổng danh mục"
-              value={categories.length}
+              value={countCategories(categories)}
               prefix={<Icon name="book" className="mr-2 !text-primary" size={22} />}
               valueStyle={{ color: '#171923', fontWeight: 700 }}
             />

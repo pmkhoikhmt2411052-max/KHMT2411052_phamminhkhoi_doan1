@@ -36,11 +36,6 @@ const SIDEBAR_ITEMS: NavItem[] = [
   { to: '/kho', label: 'Kho hàng', icon: 'warehouse', roles: [ROLES.NHAN_VIEN_KHO, ROLES.ADMIN] },
 ]
 
-const SOON_ITEMS: Array<{ label: string; icon: IconName; roles: Role[] }> = [
-  { label: 'Báo cáo', icon: 'chart', roles: [ROLES.ADMIN] },
-  { label: 'Cài đặt', icon: 'settings', roles: [ROLES.ADMIN] },
-]
-
 /** Khung chính theo mockup: header royal blue + sidebar royal blue thu gọn được. */
 export function AppLayout() {
   const { user, role, signOut } = useAuth()
@@ -49,7 +44,6 @@ export function AppLayout() {
   const displayName = user?.nhanVien?.hoTen ?? user?.khachHang?.hoTen ?? user?.taiKhoan.username ?? '—'
   const headerItems = HEADER_ITEMS.filter((item) => role && item.roles.includes(role))
   const sidebarItems = SIDEBAR_ITEMS.filter((item) => role && item.roles.includes(role))
-  const soonItems = SOON_ITEMS.filter((item) => role && item.roles.includes(role))
 
   const handleLogout = () => {
     signOut()
@@ -142,15 +136,6 @@ export function AppLayout() {
                   </NavLink>
                 </Tooltip>
               ))}
-              {!collapsed &&
-                soonItems.map((item) => (
-                  <Tooltip key={item.label} title="Chức năng chưa có nghiệp vụ">
-                    <div className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/50">
-                      <Icon name={item.icon} size={19} />
-                      <span>{item.label}</span>
-                    </div>
-                  </Tooltip>
-                ))}
             </nav>
 
             <div className="border-t border-white/20 p-3">
