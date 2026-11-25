@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { SanPhamImage } from '../components/SanPhamImage'
 import { ApiError } from '../services/api'
 import { catalogService, tenLoaiSanPham, type SanPhamChiTietDto } from '../services/catalog.service'
-import { formatDate, formatMoney } from '../utils/money'
+import { formatMoneyWhole } from '../utils/money'
 
 const { Title, Text, Paragraph } = Typography
 
@@ -113,22 +113,20 @@ export function SanPhamChiTietPage() {
               </div>
             </div>
 
-            <div className="text-3xl font-semibold text-primary">{formatMoney(product.giaBan)}</div>
+            <div className="text-3xl font-semibold text-primary">{formatMoneyWhole(product.giaBan)}</div>
 
             <Descriptions column={1} size="small" bordered>
               <Descriptions.Item label="Mã sản phẩm">{product.maSp}</Descriptions.Item>
-              <Descriptions.Item label="ISBN">{product.isbn ?? '—'}</Descriptions.Item>
-              <Descriptions.Item label="Tác giả">{product.tacGia ?? '—'}</Descriptions.Item>
-              <Descriptions.Item label="Nhà xuất bản">{product.nhaXuatBan ?? '—'}</Descriptions.Item>
-              <Descriptions.Item label="Năm xuất bản">{product.namXuatBan ?? '—'}</Descriptions.Item>
+              {product.isbn && <Descriptions.Item label="ISBN">{product.isbn}</Descriptions.Item>}
+              {product.tacGia && <Descriptions.Item label="Tác giả">{product.tacGia}</Descriptions.Item>}
+              {product.nhaXuatBan && (
+                <Descriptions.Item label="Nhà xuất bản">{product.nhaXuatBan}</Descriptions.Item>
+              )}
+              {product.namXuatBan && (
+                <Descriptions.Item label="Năm xuất bản">{product.namXuatBan}</Descriptions.Item>
+              )}
               <Descriptions.Item label="Danh mục">{product.danhMuc.tenDanhMuc}</Descriptions.Item>
-              <Descriptions.Item label="Ngày thêm">{formatDate(product.ngayTao)}</Descriptions.Item>
-              <Descriptions.Item label="Tồn kho">
-                {product.conHang ? 'Còn hàng' : 'Hết hàng'}
-                <Text type="secondary" className="!ml-2 !text-xs">
-                  (API công khai chỉ trả tình trạng, không trả số lượng cụ thể)
-                </Text>
-              </Descriptions.Item>
+              <Descriptions.Item label="Tồn kho">{product.conHang ? 'Còn hàng' : 'Hết hàng'}</Descriptions.Item>
             </Descriptions>
 
             {product.moTa && (
@@ -146,27 +144,12 @@ export function SanPhamChiTietPage() {
           <Title level={4} className="!text-primary">
             Thành phần combo / bộ truyện
           </Title>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="divide-y divide-line rounded-lg border border-line">
             {product.thanhPhan.map((item) => (
-              <Card
-                key={item.id}
-                size="small"
-                className="overflow-hidden !border-line transition hover:!border-primary/40"
-              >
-                <SanPhamImage src={item.hinhAnh} alt={item.tenSp} className="h-32 w-full" />
-                <div className="mt-2 space-y-1">
-                  <div className="font-medium">{item.tenSp}</div>
-                  <div className="text-xs text-muted">
-                    {item.maSp} · Số lượng: {item.soLuong}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-primary">{formatMoney(item.giaBan)}</span>
-                    <Tag color={item.conHang ? 'green' : 'red'}>
-                      {item.conHang ? 'Còn hàng' : 'Hết hàng'}
-                    </Tag>
-                  </div>
-                </div>
-              </Card>
+              <div key={item.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <span className="font-medium text-ink">{item.tenSp}</span>
+                <span className="shrink-0 text-sm text-muted">Số lượng: {item.soLuong}</span>
+              </div>
             ))}
           </div>
         </Card>

@@ -1,4 +1,4 @@
-import { Avatar, Badge, Button, Layout, Space, Tag, Tooltip } from 'antd'
+import { Avatar, Button, Layout, Space, Tag } from 'antd'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Icon } from '../components/Icon'
 import { Logo } from '../components/Logo'
@@ -39,34 +39,9 @@ export function PublicLayout() {
           <NavLink to="/san-pham" className={linkClass(sanPhamActive)}>
             Sản phẩm
           </NavLink>
-          <Tooltip title="Trang tin tức chưa có nghiệp vụ">
-            <span className="cursor-not-allowed rounded-md px-3 py-2 text-sm font-medium text-white/60">
-              Tin tức
-            </span>
-          </Tooltip>
-          <Tooltip title="Liên hệ qua email ở footer">
-            <span className="cursor-not-allowed rounded-md px-3 py-2 text-sm font-medium text-white/60">
-              Liên hệ
-            </span>
-          </Tooltip>
         </nav>
 
         <Space size="small" className="ml-auto">
-          <Tooltip title="Tìm sản phẩm">
-            <Button
-              type="text"
-              className="!text-white hover:!bg-white/15"
-              icon={<Icon name="search" size={18} />}
-              onClick={() => navigate('/san-pham')}
-              aria-label="Tìm sản phẩm"
-            />
-          </Tooltip>
-          <Tooltip title="Giỏ hàng online chưa triển khai">
-            <Badge count={0} size="small">
-              <Button type="text" className="!text-white hover:!bg-white/15" icon={<Icon name="cart" size={18} />} aria-label="Giỏ hàng" />
-            </Badge>
-          </Tooltip>
-
           {status === 'authenticated' ? (
             <>
               {role && (

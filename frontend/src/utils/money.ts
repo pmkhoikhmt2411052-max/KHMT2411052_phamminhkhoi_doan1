@@ -17,6 +17,16 @@ export function formatMoney(value: string | number | null | undefined): string {
   return `${moneyFormatter.format(amount)} đ`
 }
 
+const wholeFormatter = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 })
+
+/** Chỉ đổi cách hiển thị trên trang sản phẩm: "35.000 đ" (không lẻ thập phân). */
+export function formatMoneyWhole(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '—'
+  const amount = Number(value)
+  if (!Number.isFinite(amount)) return '—'
+  return `${wholeFormatter.format(amount)} đ`
+}
+
 const dateTimeFormatter = new Intl.DateTimeFormat('vi-VN', {
   timeZone: APP_TIMEZONE,
   dateStyle: 'medium',

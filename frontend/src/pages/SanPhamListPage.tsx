@@ -15,7 +15,7 @@ import {
   type SapXepTheo,
   type ThuTuSapXep,
 } from '../services/catalog.service'
-import { formatDate, formatMoney } from '../utils/money'
+import { formatMoneyWhole } from '../utils/money'
 
 const { Title, Text } = Typography
 
@@ -137,12 +137,6 @@ export function SanPhamListPage() {
             <button className={chipClass(sort === 'ngayTao' && order === 'desc')} onClick={() => { setSort('ngayTao'); setOrder('desc'); setPage(1) }}>
               Sách mới
             </button>
-            <button className={chipClass(false)} disabled title="API chưa hỗ trợ bộ lọc bán chạy">
-              Bán chạy
-            </button>
-            <button className={chipClass(false)} disabled title="API chưa hỗ trợ bộ lọc giảm giá">
-              Giảm giá
-            </button>
             <Select
               allowClear
               options={LOAI_SAN_PHAM}
@@ -241,10 +235,10 @@ export function SanPhamListPage() {
                               {product.conHang ? 'Còn hàng' : 'Hết hàng'}
                             </Tag>
                           </div>
-                          <div className="text-lg font-semibold text-primary">{formatMoney(product.giaBan)}</div>
+                          <div className="text-lg font-semibold text-primary">{formatMoneyWhole(product.giaBan)}</div>
                           <div className="text-xs text-muted">
                             {product.tacGia ? `${product.tacGia} · ` : ''}
-                            {product.maSp} · {formatDate(product.ngayTao)}
+                            {product.maSp}
                           </div>
                         </div>
                       }
