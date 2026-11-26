@@ -17,6 +17,13 @@ export function formatMoney(value: string | number | null | undefined): string {
   return `${moneyFormatter.format(amount)} đ`
 }
 
+/** Chuyển chuỗi tiền sang số để so sánh ở client; trả null nếu không hợp lệ. */
+export function toMoneyNumber(value: string | number | null | undefined): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const amount = Number(value)
+  return Number.isFinite(amount) && amount >= 0 ? amount : null
+}
+
 const wholeFormatter = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 })
 
 /** Chỉ đổi cách hiển thị trên trang sản phẩm: "35.000 đ" (không lẻ thập phân). */

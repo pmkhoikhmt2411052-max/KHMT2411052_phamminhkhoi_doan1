@@ -2,6 +2,7 @@ import { Button, Tag } from 'antd'
 import { useRef } from 'react'
 import { useReactToPrint } from 'react-to-print'
 import type { HoaDonDto } from '../services/pos.service'
+import { orderStatusLabel } from '../utils/labels'
 import { formatMoney } from '../utils/money'
 import { Invoice } from './Invoice'
 
@@ -21,7 +22,7 @@ export function InvoicePanel({ hoaDon }: InvoicePanelProps) {
     <div>
       <div className="no-print mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface p-3">
         <div className="flex items-center gap-2">
-          <Tag color="green">Đã thanh toán</Tag>
+          <Tag color="green">{orderStatusLabel(hoaDon.trangThai)}</Tag>
           <span className="text-sm text-muted">
             Tổng: <strong className="text-ink">{formatMoney(hoaDon.tongTien)}</strong>
           </span>

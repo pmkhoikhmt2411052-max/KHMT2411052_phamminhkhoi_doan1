@@ -24,7 +24,7 @@ const HEADER_ITEMS: NavItem[] = [
     roles: [ROLES.KHACH_HANG, ROLES.THU_NGAN, ROLES.NHAN_VIEN_KHO, ROLES.ADMIN],
   },
   { to: '/san-pham', label: 'Sản phẩm', icon: 'book', roles: [ROLES.KHACH_HANG, ROLES.ADMIN] },
-  { to: '/pos', label: 'Bán hàng', icon: 'cart', roles: [ROLES.THU_NGAN] },
+  { to: '/pos', label: 'Bán hàng', icon: 'cart', roles: [ROLES.THU_NGAN, ROLES.ADMIN] },
   { to: '/pos/don-hang', label: 'Đơn hàng', icon: 'receipt', roles: [ROLES.THU_NGAN, ROLES.ADMIN] },
   { to: '/kho', label: 'Kho hàng', icon: 'warehouse', roles: [ROLES.NHAN_VIEN_KHO, ROLES.ADMIN] },
   { to: '/quan-tri', label: 'Quản trị', icon: 'settings', roles: [ROLES.ADMIN], chevron: true },
@@ -33,10 +33,9 @@ const HEADER_ITEMS: NavItem[] = [
 const SIDEBAR_ITEMS: NavItem[] = [
   { to: '/', label: 'Trang chủ', icon: 'home', roles: [ROLES.KHACH_HANG] },
   { to: '/quan-tri', label: 'Tổng quan', icon: 'chart', roles: [ROLES.ADMIN] },
-  { to: '/pos', label: 'Tổng quan', icon: 'chart', roles: [ROLES.THU_NGAN] },
   { to: '/kho', label: 'Tổng quan', icon: 'chart', roles: [ROLES.NHAN_VIEN_KHO] },
   { to: '/san-pham', label: 'Sản phẩm', icon: 'book', roles: [ROLES.KHACH_HANG, ROLES.ADMIN] },
-  { to: '/pos', label: 'Bán hàng', icon: 'cart', roles: [ROLES.THU_NGAN] },
+  { to: '/pos', label: 'Bán hàng', icon: 'cart', roles: [ROLES.THU_NGAN, ROLES.ADMIN] },
   { to: '/pos/don-hang', label: 'Đơn hàng', icon: 'receipt', roles: [ROLES.THU_NGAN, ROLES.ADMIN] },
   { to: '/kho', label: 'Kho hàng', icon: 'warehouse', roles: [ROLES.NHAN_VIEN_KHO, ROLES.ADMIN] },
 ]
@@ -80,7 +79,7 @@ export function AppLayout() {
 
         <nav className="hidden flex-1 items-center gap-1 lg:flex">
           {headerItems.map((item) => (
-            <NavLink key={`top-${item.to}-${item.label}`} to={item.to} end={item.to === '/'} className={navClass}>
+            <NavLink key={`top-${item.to}-${item.label}`} to={item.to} end={item.to === '/' || item.to === '/pos'} className={navClass}>
               {item.label}
               {item.chevron && <Icon name="chevron" size={13} className="rotate-90" />}
             </NavLink>
@@ -131,7 +130,7 @@ export function AppLayout() {
                 <Tooltip key={`side-${item.to}-${item.label}`} title={collapsed ? item.label : undefined} placement="right">
                   <NavLink
                     to={item.to}
-                    end={item.to === '/'}
+                    end={item.to === '/' || item.to === '/pos'}
                     className={({ isActive }) =>
                       `${navClass({ isActive })} ${collapsed ? 'justify-center px-0' : ''}`
                     }

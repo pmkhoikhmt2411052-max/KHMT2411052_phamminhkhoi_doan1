@@ -1,7 +1,9 @@
 import { forwardRef } from 'react'
-import { Logo } from './Logo'
+import { STORE_INFO } from '../config/store'
 import type { HoaDonDto } from '../services/pos.service'
+import { channelLabel, orderStatusLabel, paymentMethodLabel, paymentStatusLabel } from '../utils/labels'
 import { formatDateTime, formatMoney } from '../utils/money'
+import { Logo } from './Logo'
 
 interface InvoiceProps {
   hoaDon: HoaDonDto
@@ -16,14 +18,20 @@ export const Invoice = forwardRef<HTMLDivElement, InvoiceProps>(function Invoice
           <Logo className="h-16" />
           <div>
             <p className="text-lg font-bold tracking-wide text-primary">HÓA ĐƠN BÁN HÀNG</p>
-            <p className="text-xs text-muted">Hóa đơn bán lẻ · kênh {hoaDon.kenhBan}</p>
+            <p className="text-xs text-muted">Hóa đơn bán lẻ · kênh {channelLabel(hoaDon.kenhBan)}</p>
           </div>
         </div>
         <div className="text-right">
           <p className="text-lg font-semibold">Số: {hoaDon.maDh}</p>
           <p className="text-xs text-muted">Ngày: {formatDateTime(hoaDon.ngayTao)}</p>
-          <p className="text-xs text-muted">Trạng thái: {hoaDon.trangThai}</p>
+          <p className="text-xs text-muted">Trạng thái: {orderStatusLabel(hoaDon.trangThai)}</p>
         </div>
+      </div>
+
+      <div className="mb-5 rounded-lg border border-line p-3 text-xs">
+        <p className="font-semibold text-primary">{STORE_INFO.name}</p>
+        <p className="text-muted">Địa chỉ: {STORE_INFO.address}</p>
+        <p className="text-muted">Điện thoại: {STORE_INFO.phone}</p>
       </div>
 
       <div className="mb-5 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
@@ -91,7 +99,7 @@ export const Invoice = forwardRef<HTMLDivElement, InvoiceProps>(function Invoice
               <span>{formatMoney(hoaDon.tienKhachDua)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted">Tiền thối</span>
+              <span className="text-muted">Tiền thừa</span>
               <span>{formatMoney(hoaDon.tienThua)}</span>
             </div>
           </>
@@ -101,7 +109,9 @@ export const Invoice = forwardRef<HTMLDivElement, InvoiceProps>(function Invoice
       <div className="mt-6 flex flex-wrap justify-between gap-3 border-t border-line pt-4 text-xs text-muted">
         <span>Điểm tích lũy cộng thêm: {hoaDon.diemCong}</span>
         <span>
-          Thanh toán: {hoaDon.thanhToan?.phuongThuc ?? '—'} · {formatDateTime(hoaDon.thanhToan?.thoiGian ?? hoaDon.ngayThanhToan)}
+          Thanh toán: {paymentMethodLabel(hoaDon.thanhToan?.phuongThuc)} ·{' '}
+          {paymentStatusLabel(hoaDon.thanhToan?.trangThai)} ·{' '}
+          {formatDateTime(hoaDon.thanhToan?.thoiGian ?? hoaDon.ngayThanhToan)}
         </span>
       </div>
       <p className="mt-6 text-center text-xs text-muted">
