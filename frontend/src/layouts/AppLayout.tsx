@@ -73,9 +73,9 @@ export function AppLayout() {
 
         <Link
           to={role ? ROLE_HOME[role] : '/dang-nhap'}
-          className="flex h-12 shrink-0 items-center rounded-lg bg-white px-2.5 py-1.5 shadow-sm"
+          className="flex h-11 shrink-0 items-center rounded-md bg-white px-1 py-0.5 shadow-sm"
         >
-          <Logo className="h-12" />
+          <Logo className="h-11" />
         </Link>
 
         <nav className="hidden flex-1 items-center gap-1 lg:flex">

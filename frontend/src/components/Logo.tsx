@@ -6,13 +6,14 @@ interface LogoProps {
 
 /**
  * Logo chính thức của BookMark Nhà Sách.
- * Nguồn duy nhất: /images/bookmark-logo.png (frontend/public/images/bookmark-logo.png).
- * Không tự vẽ/chỉnh màu/cắt ảnh — chỉ hiển thị với object-fit: contain.
+ * File gốc `/images/bookmark-logo.png` được giữ nguyên, không chỉnh sửa.
+ * Bản hiển thị `/images/bookmark-logo-cropped.png` được cắt sát viền + nền trong suốt
+ * từ chính file gốc (xử lý bằng PIL, không vẽ lại/không đổi màu navy–gold).
  */
 export function Logo({ className = 'h-12', alt = 'BookMark Nhà Sách' }: LogoProps) {
   return (
     <img
-      src="/images/bookmark-logo.png"
+      src="/images/bookmark-logo-cropped.png"
       alt={alt}
       className={`block max-w-full object-contain ${className}`}
     />

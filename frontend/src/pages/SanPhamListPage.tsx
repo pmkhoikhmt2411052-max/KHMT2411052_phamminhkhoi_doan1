@@ -1,6 +1,6 @@
 import { Alert, Button, Card, Empty, Input, Pagination, Select, Spin, Tag, Typography } from 'antd'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Icon } from '../components/Icon'
 import { SanPhamImage } from '../components/SanPhamImage'
 import { ApiError } from '../services/api'
@@ -39,6 +39,7 @@ function flattenCategories(nodes: DanhMucNode[], depth = 0): Array<{ id: number;
 
 /** UC11 — danh sách sản phẩm công khai theo mockup: sidebar danh mục + lưới card. */
 export function SanPhamListPage() {
+  const [searchParams] = useSearchParams()
   const [keyword, setKeyword] = useState('')
   const [q, setQ] = useState('')
   const [danhMucId, setDanhMucId] = useState<number | undefined>()
@@ -59,6 +60,14 @@ export function SanPhamListPage() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // Mega menu dẫn tới /san-pham?danhMucId=... — backend đã gồm cả danh mục con.
+  useEffect(() => {
+    const raw = searchParams.get('danhMucId')
+    const parsed = raw ? Number(raw) : NaN
+    setDanhMucId(Number.isInteger(parsed) && parsed > 0 ? parsed : undefined)
+    setPage(1)
+  }, [searchParams])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
