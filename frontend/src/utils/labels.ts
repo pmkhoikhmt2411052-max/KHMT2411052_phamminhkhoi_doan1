@@ -40,3 +40,27 @@ export function paymentStatusLabel(code: string | null | undefined): string {
 export function channelLabel(code: string): string {
   return CHANNEL[code] ?? code
 }
+
+const PHIEU_NHAP_STATUS: Record<string, string> = {
+  NHAP: 'Nháp',
+  CHO_XAC_NHAN: 'Chờ xác nhận',
+  DA_NHAP_KHO: 'Đã nhập kho',
+  DA_HUY: 'Đã hủy',
+}
+
+const BIEN_DONG_TON_KHO: Record<string, string> = {
+  NHAP_KHO: 'Nhập kho',
+  BAN_HANG: 'Bán hàng',
+  KIEM_KE: 'Kiểm kê',
+  HUY_DON: 'Hủy đơn',
+  HOAN_TRA: 'Hoàn trả',
+  DIEU_CHINH: 'Điều chỉnh',
+}
+
+export function phieuNhapStatusLabel(code: string): string {
+  return PHIEU_NHAP_STATUS[code] ?? code
+}
+
+export function bienDongTonKhoLabel(code: string): string {
+  return BIEN_DONG_TON_KHO[code] ?? code
+}
